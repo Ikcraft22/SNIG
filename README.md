@@ -1,4 +1,4 @@
-# Sistema de Inventario de Medicamentos
+# Sistema de Inventario
 
 Documentación actualizada el 11 de agosto de 2026.
 
