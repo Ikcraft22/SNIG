@@ -70,7 +70,7 @@ class InterfazTerminal:
         """Muestra el menú principal"""
         self.limpiar_pantalla()
         print("=" * 70)
-        print("🏥 SISTEMA DE INVENTARIO DE MEDICAMENTOS".center(70))
+        print("📦 SISTEMA DE INVENTARIO GENERAL".center(70))
         print("=" * 70)
         print("\n1. 📦 Gestión de Inventario")
         print("2. 🛒 Punto de Venta (POS)")

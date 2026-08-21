@@ -6,7 +6,7 @@ Estado: funcional
 
 ## 1. Introducción
 
-Este proyecto implementa un sistema de inventario y punto de venta para negocios farmacéuticos y comercios minoristas. Está diseñado para funcionar localmente con SQLite por defecto y ofrece una interfaz gráfica moderna y táctil basada en PyQt5, además de una capa web con Flask.
+Este proyecto implementa un sistema de inventario y punto de venta para comercios minoristas. Está diseñado para funcionar localmente con SQLite por defecto y ofrece una interfaz gráfica moderna y táctil basada en PyQt5, además de una capa web con Flask.
 
 ## 2. Objetivos del sistema
 
@@ -85,7 +85,7 @@ MYSQL_HOST=localhost
 MYSQL_PORT=3306
 MYSQL_USER=root
 MYSQL_PASSWORD=
-MYSQL_DATABASE=inventario_medicamentos
+MYSQL_DATABASE=inventario_general
 ```
 
 ## 6. Ejecución
@@ -466,7 +466,7 @@ Integraciones:
 
 **Modelos:**
 ```python
-- Producto: medicamentos
+- Producto: artículos del catálogo
 - Presentacion: tabletas, ampollas, etc.
 - MovimientoInventario: entrada/salida/ajuste
 - Venta: tickets de caja
@@ -681,7 +681,7 @@ GET  /api/ventas/reporte/<fecha> # Reporte de ventas
 ✅ Gratuita  
 ✅ Sin límite de requests  
 ✅ Amplia base de datos  
-✅ Información de medicamentos  
+✅ Información de productos
 
 **Desventajas:**
 ❌ Resultados ocasionalmente incompletos  
@@ -695,7 +695,7 @@ GET  /api/ventas/reporte/<fecha> # Reporte de ventas
     "product_name": "Paracetamol 500mg",
     "brands": "Laboratorio Genérico",
     "ingredients_text": "Paracetamol...",
-    "categories": "Medicamentos"
+    "categories": "Productos"
   }
 }
 ```
@@ -817,12 +817,12 @@ fecha_creacion
 
 **Crear backup:**
 ```bash
-mysqldump -u root -p inventario_medicamentos > backup.sql
+mysqldump -u root -p inventario_general > backup.sql
 ```
 
 **Restaurar backup:**
 ```bash
-mysql -u root -p inventario_medicamentos < backup.sql
+mysql -u root -p inventario_general < backup.sql
 ```
 
 **Backup automático con Python:**
@@ -831,7 +831,7 @@ import subprocess
 from datetime import datetime
 
 fecha = datetime.now().strftime("%Y%m%d_%H%M%S")
-comando = f'mysqldump -u root inventario_medicamentos > backup_{fecha}.sql'
+comando = f'mysqldump -u root inventario_general > backup_{fecha}.sql'
 subprocess.run(comando, shell=True)
 ```
 
@@ -949,7 +949,7 @@ reportes.html
 
 ## Ejemplos de Uso
 
-### Ejemplo 1: Registrar un Medicamento Completo
+### Ejemplo 1: Registrar un Producto Completo
 
 ```python
 from database.connection import SessionLocal, init_db
@@ -1115,13 +1115,13 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '';
 FLUSH PRIVILEGES;
 ```
 
-### Error: "Database 'inventario_medicamentos' does not exist"
+### Error: "Database 'inventario_general' does not exist"
 
 **Causa:** La base de datos no fue creada
 
 **Solución:**
 ```sql
-CREATE DATABASE inventario_medicamentos CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE inventario_general CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
 ### Error: "PyQt5 is not installed"
@@ -1242,7 +1242,7 @@ import time
 
 def backup():
     fecha = datetime.now().strftime("%Y%m%d_%H%M%S")
-    cmd = f'mysqldump -u root inventario_medicamentos > backup_{fecha}.sql'
+    cmd = f'mysqldump -u root inventario_general > backup_{fecha}.sql'
     subprocess.run(cmd, shell=True)
     print(f"✅ Backup creado: backup_{fecha}.sql")
 
@@ -1271,9 +1271,9 @@ while True:
 
 **Ejemplo:**
 ```python
-# api/farmacos_api.py
-class FarmacosAPI:
-    def buscar_medicamento(self, nombre):
+# api/productos_api.py
+class ProductosAPI:
+    def buscar_producto(self, nombre):
         # Implementar búsqueda
         pass
 ```
@@ -1323,7 +1323,7 @@ class FarmacosAPI:
 
 ## Conclusión
 
-Este sistema proporciona una **solución profesional, completa y escalable** para la gestión de inventario y ventas en farmacias. 
+Este sistema proporciona una **solución profesional, completa y escalable** para la gestión de inventario y ventas en comercios minoristas.
 
 ### Puntos Clave:
 ✅ **Modular**: Fácil de extender  

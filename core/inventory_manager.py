@@ -20,7 +20,7 @@ from api.gtin_lookup import GTINBuscador
 logger = logging.getLogger(__name__)
 
 class GestorInventario:
-    """Gestor de inventario de medicamentos"""
+    """Gestor de inventario general de productos"""
     
     def __init__(self, db: Session):
         """

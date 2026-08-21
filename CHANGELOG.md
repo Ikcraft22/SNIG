@@ -36,7 +36,7 @@
 - ✅ Se actualizaron los ejemplos de configuración para .env
 
 ### Estado actual del sistema
-- Sistema funcional para inventario y ventas de medicamentos
+- Sistema funcional para inventario y ventas
 - Soporte para productos, presentaciones, movimientos y ventas
 - API web básica disponible con Flask
 - Menú principal para elegir interfaz

@@ -25,7 +25,7 @@ class EstadoVenta(str, enum.Enum):
 # ============== MODELOS ==============
 
 class Producto(Base):
-    """Modelo de Producto/Medicamento"""
+    """Modelo de Producto"""
     __tablename__ = "productos"
     
     id = Column(Integer, primary_key=True)

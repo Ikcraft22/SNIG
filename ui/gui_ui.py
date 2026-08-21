@@ -79,7 +79,7 @@ class VentanaPrincipal(QMainWindow):
         """Inicializa la ventana principal"""
         super().__init__()
         
-        self.setWindowTitle("Sistema de Inventario de Medicamentos")
+        self.setWindowTitle("Sistema de Inventario General")
         
         # Inicializar gestores
         self.db = SessionLocal()

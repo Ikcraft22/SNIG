@@ -69,7 +69,7 @@ MYSQL_HOST=localhost
 MYSQL_PORT=3306
 MYSQL_USER=root
 MYSQL_PASSWORD=
-MYSQL_DATABASE=inventario_medicamentos
+MYSQL_DATABASE=inventario_general
 ```
 
 ## ¿La base de datos se crea sola?

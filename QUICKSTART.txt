@@ -6,7 +6,7 @@ Sigue estos pasos para empezar
 
 print("""
 ╔════════════════════════════════════════════════════════════════════════╗
-║  🏥 SISTEMA DE INVENTARIO DE MEDICAMENTOS - INICIO RÁPIDO             ║
+║  📦 SISTEMA DE INVENTARIO GENERAL - INICIO RÁPIDO                     ║
 ║                          (5 MINUTOS)                                   ║
 ╚════════════════════════════════════════════════════════════════════════╝
 
@@ -44,7 +44,7 @@ Si prefieres MySQL, crea la base de datos y configura .env con:
   MYSQL_PORT=3306
   MYSQL_USER=root
   MYSQL_PASSWORD=
-  MYSQL_DATABASE=inventario_medicamentos
+  MYSQL_DATABASE=inventario_general
 
 Si vas a usar SQLite, no necesitas hacer nada adicional.
 

@@ -90,7 +90,7 @@ def crear_tablas():
         print("1. Verifica que MySQL esté corriendo en XAMPP")
         print("2. Verifica la configuración en .env")
         print("3. Asegúrate de que la base de datos existe:")
-        print("   CREATE DATABASE inventario_medicamentos;")
+        print("   CREATE DATABASE inventario_general;")
         return False
 
 def crear_usuario_administrador():
@@ -115,7 +115,7 @@ def crear_usuario_administrador():
         # Crear admin
         admin = Usuario(
             nombre="Administrador",
-            email="admin@farmacia.local",
+            email="admin@tienda.local",
             rol="admin",
             activo=True
         )
@@ -234,7 +234,7 @@ def mostrar_resumen():
 
 def main():
     """Función principal"""
-    print("\n🏥 INICIALIZADOR DEL SISTEMA DE INVENTARIO DE MEDICAMENTOS\n")
+    print("\n📦 INICIALIZADOR DEL SISTEMA DE INVENTARIO GENERAL\n")
     
     # Validar ambiente
     if not validar_ambiente():

@@ -12,7 +12,7 @@ MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
 MYSQL_PORT = int(os.getenv("MYSQL_PORT", 3306))
 MYSQL_USER = os.getenv("MYSQL_USER", "root")
 MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
-MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "inventario_medicamentos")
+MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "inventario_general")
 
 SQLITE_FILE = os.getenv("SQLITE_FILE", "inventario.db")
 SQLITE_PATH = Path(SQLITE_FILE)
@@ -41,7 +41,7 @@ OPENFOODFACTS_API_URL = "https://world.openfoodfacts.org/api/v0"
 # ============== CONFIGURACIÓN DE RUTAS ==============
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
-CSV_FILE = os.path.join(DATA_DIR, "CÓDIGO_ÚNICO_DE_MEDICAMENTOS_VIGENTES_20250922.csv")
+CSV_FILE = os.path.join(DATA_DIR, "CATALOGO_PRODUCTOS.csv")
 
 # ============== CONFIGURACIÓN DE APLICACIÓN ==============
 DEBUG = os.getenv("DEBUG", "True") == "True"

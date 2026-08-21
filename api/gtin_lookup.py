@@ -68,7 +68,7 @@ class GTINLookup:
         try:
             url = "https://www.googleapis.com/customsearch/v1"
             params = {
-                "q": f"{gtin} medicamento",
+                "q": f"{gtin} producto",
                 "key": GOOGLE_API_KEY,
                 "cx": GOOGLE_SEARCH_ENGINE_ID,
                 "num": 1

@@ -1,0 +1,47 @@
+# Entorno virtual
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Archivos de entorno y configuración local
+.env
+.env.*
+*.local
+
+# Bases de datos locales
+*.db
+*.sqlite3
+
+# Logs y cachés
+*.log
+logs/
+
+# PyQt / GUI temporal
+*.autosave
+*.bak
+*.tmp
+
+# IDE/editor
+.vscode/
+.idea/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos de compilación
+build/
+dist/
+*.egg-info/
+
+# Archivos de inicio propios de la app
+.startup_state.json
