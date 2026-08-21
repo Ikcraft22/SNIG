@@ -1,0 +1,13 @@
+flask==2.3.3
+flask-cors==4.0.0
+mysql-connector-python==8.0.33
+sqlalchemy==2.0.20
+pandas==2.0.3
+openpyxl==3.1.2
+requests==2.31.0
+beautifulsoup4==4.12.2
+python-dotenv==1.0.0
+pydantic==2.0.3
+PyQt5==5.15.9
+PyQt5-sip==12.13.0
+Pillow==10.0.0

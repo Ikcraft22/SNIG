@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Inventario - Inicio</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        nav {
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 1rem;
+            display: flex;
+            gap: 2rem;
+        }
+        
+        nav a {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+        
+        nav a:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+        }
+        
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+        
+        .card p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-size: 1rem;
+        }
+        
+        .btn:hover {
+            background: #764ba2;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+        }
+        
+        .btn-success {
+            background: #48bb78;
+        }
+        
+        .btn-warning {
+            background: #ed8936;
+        }
+        
+        .btn-info {
+            background: #4299e1;
+        }
+        
+        footer {
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            text-align: center;
+            padding: 1rem;
+            margin-top: auto;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">🏠 Inicio</a>
+        <a href="/inventario">📦 Inventario</a>
+        <a href="/pos">🛒 POS</a>
+        <a href="/reportes">📊 Reportes</a>
+    </nav>
+    
+    <div class="container">
+        <div class="card">
+            <h2>📦 Inventario</h2>
+            <p>Gestiona el inventario de medicamentos, consulta stock y realiza movimientos de entrada/salida.</p>
+            <a href="/inventario" class="btn btn-primary">Ir a Inventario</a>
+        </div>
+        
+        <div class="card">
+            <h2>🛒 Punto de Venta</h2>
+            <p>Procesa ventas, crea tickets y gestiona el carrito de compra con facilidad.</p>
+            <a href="/pos" class="btn btn-success">Ir a POS</a>
+        </div>
+        
+        <div class="card">
+            <h2>📊 Reportes</h2>
+            <p>Visualiza reportes de inventario, ventas y análisis en tiempo real.</p>
+            <a href="/reportes" class="btn btn-info">Ver Reportes</a>
+        </div>
+    </div>
+    
+    <footer>
+        <p>&copy; 2025 Sistema de Inventario de Medicamentos | Versión 1.0</p>
+    </footer>
+</body>
+</html>

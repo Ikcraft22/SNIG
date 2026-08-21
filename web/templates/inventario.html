@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventario</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 1rem;
+        }
+        
+        .search-box {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .search-box input {
+            flex: 1;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        
+        .search-box button {
+            padding: 0.75rem 1.5rem;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .search-box button:hover {
+            background: #764ba2;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        th {
+            background: #f7f7f7;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        tr:hover {
+            background: #f9f9f9;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            cursor: pointer;
+            border: none;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: #764ba2;
+        }
+        
+        .btn-small {
+            padding: 0.25rem 0.75rem;
+            font-size: 0.875rem;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-size: 1.5rem;
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 Gestión de Inventario</h1>
+        
+        <div class="search-box">
+            <input type="text" id="gtin-input" placeholder="Escanea o ingresa GTIN..." autofocus>
+            <button onclick="buscarProducto()">🔍 Buscar</button>
+            <button onclick="location.href='/'">⬅️ Volver</button>
+        </div>
+        
+        <div id="error-msg" class="error" style="display: none;"></div>
+        <div id="loading" class="loading" style="display: none;">⏳ Cargando...</div>
+        
+        <table id="productos-table">
+            <thead>
+                <tr>
+                    <th>GTIN</th>
+                    <th>Nombre</th>
+                    <th>Laboratorio</th>
+                    <th>Presentación</th>
+                    <th>Stock</th>
+                    <th>Precio</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="productos-body">
+                <tr>
+                    <td colspan="7" style="text-align: center; color: #999;">
+                        Ingresa un GTIN para buscar productos
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <script>
+        function mostrarError(mensaje) {
+            document.getElementById('error-msg').textContent = mensaje;
+            document.getElementById('error-msg').style.display = 'block';
+            setTimeout(() => {
+                document.getElementById('error-msg').style.display = 'none';
+            }, 5000);
+        }
+        
+        function buscarProducto() {
+            const gtin = document.getElementById('gtin-input').value.trim();
+            
+            if (!gtin) {
+                mostrarError('Ingresa un GTIN');
+                return;
+            }
+            
+            document.getElementById('loading').style.display = 'block';
+            
+            fetch(`/api/productos/${gtin}`)
+                .then(response => {
+                    if (response.status === 404) {
+                        throw new Error('Producto no encontrado');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    mostrarProducto(data);
+                })
+                .catch(error => {
+                    mostrarError(error.message);
+                })
+                .finally(() => {
+                    document.getElementById('loading').style.display = 'none';
+                });
+        }
+        
+        function mostrarProducto(producto) {
+            const tbody = document.getElementById('productos-body');
+            tbody.innerHTML = '';
+            
+            producto.presentaciones.forEach(pres => {
+                const fila = `
+                    <tr>
+                        <td>${producto.gtin}</td>
+                        <td>${producto.nombre}</td>
+                        <td>${producto.laboratorio || 'N/A'}</td>
+                        <td>${pres.tipo}</td>
+                        <td>${pres.stock}</td>
+                        <td>$${pres.precio_venta.toFixed(2)}</td>
+                        <td>
+                            <button class="btn btn-small" onclick="registrarEntrada(${pres.id})">Entrada</button>
+                            <button class="btn btn-small" onclick="registrarSalida(${pres.id})">Salida</button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += fila;
+            });
+        }
+        
+        function registrarEntrada(presentacionId) {
+            alert('Funcionalidad en desarrollo');
+        }
+        
+        function registrarSalida(presentacionId) {
+            alert('Funcionalidad en desarrollo');
+        }
+        
+        document.getElementById('gtin-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                buscarProducto();
+            }
+        });
+    </script>
+</body>
+</html>

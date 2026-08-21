@@ -1,2 +1,179 @@
-# Ficha-3251447-Proyecto-SISTEMA-DE-INVENTARIO-PARA-UNA-TIENDA
-Sistema de inventario para tiendas escolares que registra productos, controla entradas, salidas y existencias, e imprime reportes para optimizar la gestión y toma de decisiones.
+# Sistema de Inventario de Medicamentos
+
+Documentación actualizada el 11 de agosto de 2026.
+
+## Resumen del proyecto
+
+Este proyecto es un sistema local de inventario y punto de venta para negocios farmacéuticos o minoristas que necesitan gestionar stock, ventas y reportes con una interfaz pensada para uso rápido y táctil.
+
+Actualmente incluye:
+
+- gestión de productos y presentaciones
+- control de stock por entradas, salidas y ajustes
+- punto de venta con escaneo rápido por GTIN
+- carrito de compra y cálculo automático de totales
+- reportes de inventario y ventas
+- interfaz gráfica con PyQt5
+- flujo de pago simplificado con selección numérica
+- detección automática de modo oscuro según el sistema
+
+## Estado actual
+
+Versión actual: 1.0.3
+Estado: funcional y listo para uso local con GUI
+
+## Características principales de la GUI
+
+La interfaz gráfica actual incluye varias mejoras orientadas a rapidez y ergonomía:
+
+- pestañas de tamaño grande y distribuidas uniformemente
+- tabla de inventario responsive y adaptada al ancho de la ventana
+- botones de acción más grandes para uso táctil
+- búsqueda rápida de productos con lupa
+- agregado directo de artículos al carrito desde el POS
+- flujo de cobro sin pedir nombre de cajero
+- método de pago con selección numérica:
+  - 1 = Efectivo
+  - 2 = Tarjeta
+  - 3 = Transferencia
+- botón de pago, vaciar carrito y eliminar producto con tamaños ampliados
+- detección automática de modo oscuro basado en el sistema
+
+## Requisitos
+
+- Python 3.10 o superior
+- pip
+- SQLite (incluido con Python)
+- PyQt5 para la interfaz gráfica
+- Flask para la versión web
+
+## Instalación rápida
+
+1. Crear y activar entorno virtual
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+```
+
+2. Instalar dependencias
+
+```bash
+pip install -r requirements.txt
+```
+
+3. Ejecutar la aplicación
+
+```bash
+python main.py
+```
+
+La aplicación inicia por defecto la interfaz gráfica principal.
+
+## Uso recomendado
+
+### Interfaz gráfica
+
+Desde la app se presentan estas pestañas principales:
+
+- Inventario
+- POS
+- Reportes
+- Logs (oculto por defecto y accesible desde reportes o acciones avanzadas)
+
+### Flujo de POS
+
+- escribe o escanea el GTIN en el campo del POS
+- presiona Enter para agregar el producto al carrito
+- revisa los artículos agregados
+- pulsa Pago
+- selecciona el método de pago por número:
+  - 1 para Efectivo
+  - 2 para Tarjeta
+  - 3 para Transferencia
+
+### Flujo de inventario
+
+- busca productos por texto o GTIN
+- agrega nuevos productos o presentaciones
+- gestiona movimientos de stock
+- revisa en la tabla la información principal del catálogo
+
+## Configuración
+
+La configuración por defecto usa SQLite:
+
+```env
+DB_ENGINE=sqlite
+SQLITE_FILE=./inventario.db
+```
+
+Si quieres usar MySQL, puedes configurarlo en .env:
+
+```env
+DB_ENGINE=mysql
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=
+MYSQL_DATABASE=inventario_medicamentos
+```
+
+## Estructura principal del proyecto
+
+- config/: configuración del sistema
+- database/: modelos SQLAlchemy y conexión a la base de datos
+- core/: lógica del inventario y del punto de venta
+- api/: integrations con servicios externos de GTIN
+- ui/: interfaces de terminal, GUI y componentes visuales
+- web/: aplicación Flask
+- data/: recursos y archivos de datos
+- tests/: pruebas del proyecto
+
+## Funcionalidades actuales
+
+- registro de productos y presentaciones
+- control de stock y movimientos
+- ventas y cálculo de totales
+- generador de reportes
+- consulta por GTIN
+- soporte para múltiples interfaces
+- interfaz gráfica potente y adaptable a diferentes tamaños de pantalla
+- modo oscuro automático
+
+## Solución de problemas rápidos
+
+### PyQt5 no está instalado
+```bash
+pip install PyQt5
+```
+
+### Flask no está instalado
+```bash
+pip install flask
+```
+
+### Error con MySQL
+- verifica que XAMPP o el servicio MySQL esté activo
+- revisa .env
+- confirma que la base de datos existe
+
+## Documentación adicional
+
+- [CHANGELOG.md](CHANGELOG.md)
+- [DOCUMENTACION_COMPLETA.md](DOCUMENTACION_COMPLETA.md)
+- [FAQ.md](FAQ.md)
+
+## Roadmap
+
+- autenticación de usuarios
+- exportación a Excel/PDF
+- reportes más avanzados
+- validaciones adicionales de negocio
+- pruebas automáticas
+- mejoras de sincronización y escalabilidad
+
+---
+
+Última actualización: 11 de agosto de 2026
+Versión: 1.0.3

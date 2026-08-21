@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reportes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #3182ce;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #3182ce;
+            padding-bottom: 1rem;
+        }
+        
+        .reportes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .reporte-card {
+            background: #f7f7f7;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid #3182ce;
+        }
+        
+        .reporte-card h2 {
+            color: #3182ce;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+        
+        .reporte-card p {
+            color: #666;
+            line-height: 1.8;
+            margin-bottom: 0.5rem;
+        }
+        
+        .reporte-valor {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #3182ce;
+            margin: 1rem 0;
+        }
+        
+        button {
+            padding: 0.75rem 1.5rem;
+            background: #3182ce;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 1rem;
+        }
+        
+        button:hover {
+            background: #2c5aa0;
+        }
+        
+        .back-btn {
+            background: #666;
+        }
+        
+        .back-btn:hover {
+            background: #555;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #3182ce;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Reportes</h1>
+        
+        <div class="reportes-grid" id="reportes-container">
+            <div class="reporte-card">
+                <h2>📦 Inventario</h2>
+                <p id="reporte-inventario">Cargando...</p>
+                <button onclick="cargarReporteInventario()">Actualizar</button>
+            </div>
+            
+            <div class="reporte-card">
+                <h2>🛒 Ventas Diarias</h2>
+                <p id="reporte-ventas">Cargando...</p>
+                <button onclick="cargarReporteVentas()">Actualizar</button>
+            </div>
+            
+            <div class="reporte-card">
+                <h2>⚠️ Stock Bajo</h2>
+                <p id="reporte-stock-bajo">Cargando...</p>
+                <button onclick="cargarStockBajo()">Actualizar</button>
+            </div>
+        </div>
+        
+        <button class="back-btn" onclick="location.href='/'">⬅️ Volver</button>
+    </div>
+    
+    <script>
+        function cargarReporteInventario() {
+            fetch('/api/inventario/reporte')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('reporte-inventario').innerHTML = `
+                        <p>Total de Productos: <strong>${data.total_productos}</strong></p>
+                        <p>Stock Total: <strong>${data.total_stock}</strong> unidades</p>
+                        <p>Valor Inventario: <strong>$${data.valor_inventario.toFixed(2)}</strong></p>
+                        <p>Productos sin Stock: <strong>${data.productos_sin_stock}</strong></p>
+                        <p>Productos en Alerta: <strong>${data.productos_alerta}</strong></p>
+                        <p style="font-size: 0.9rem; color: #999;">Última actualización: ${new Date().toLocaleTimeString()}</p>
+                    `;
+                })
+                .catch(error => {
+                    document.getElementById('reporte-inventario').innerHTML = `Error: ${error.message}`;
+                });
+        }
+        
+        function cargarReporteVentas() {
+            const hoy = new Date().toISOString().split('T')[0];
+            fetch(`/api/ventas/reporte/${hoy}`)
+                .then(response => response.json())
+                .then(data => {
+                    let metodospago = '';
+                    for (const [metodo, monto] of Object.entries(data.metodos_pago)) {
+                        metodospago += `<p>${metodo}: $${monto.toFixed(2)}</p>`;
+                    }
+                    
+                    document.getElementById('reporte-ventas').innerHTML = `
+                        <p>Ventas del Día: <strong>${data.cantidad_ventas}</strong></p>
+                        <p>Total de Ventas: <strong>$${data.total_ventas.toFixed(2)}</strong></p>
+                        <p>Promedio por Venta: <strong>$${data.promedio_venta.toFixed(2)}</strong></p>
+                        <p><strong>Métodos de Pago:</strong></p>
+                        ${metodospago}
+                        <p style="font-size: 0.9rem; color: #999;">Última actualización: ${new Date().toLocaleTimeString()}</p>
+                    `;
+                })
+                .catch(error => {
+                    document.getElementById('reporte-ventas').innerHTML = `Error: ${error.message}`;
+                });
+        }
+        
+        function cargarStockBajo() {
+            fetch('/api/inventario/stock-bajo')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        document.getElementById('reporte-stock-bajo').innerHTML = '<p>✅ Todos los productos tienen stock adecuado</p>';
+                    } else {
+                        let html = `<p>⚠️ ${data.length} producto(s) con stock bajo:</p>`;
+                        data.forEach(p => {
+                            html += `<p>${p.nombre} (${p.presentacion}): ${p.stock_actual}/${p.stock_minimo}</p>`;
+                        });
+                        document.getElementById('reporte-stock-bajo').innerHTML = html;
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('reporte-stock-bajo').innerHTML = `Error: ${error.message}`;
+                });
+        }
+        
+        // Cargar reportes al iniciar
+        cargarReporteInventario();
+        cargarReporteVentas();
+        cargarStockBajo();
+        
+        // Actualizar cada 30 segundos
+        setInterval(() => {
+            cargarReporteInventario();
+            cargarReporteVentas();
+            cargarStockBajo();
+        }, 30000);
+    </script>
+</body>
+</html>
