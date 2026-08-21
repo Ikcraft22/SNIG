@@ -4,7 +4,7 @@ Documentación actualizada el 11 de agosto de 2026.
 
 ## Resumen del proyecto
 
-Este proyecto es un sistema local de inventario y punto de venta para negocios farmacéuticos o minoristas que necesitan gestionar stock, ventas y reportes con una interfaz pensada para uso rápido y táctil.
+Este proyecto es un sistema local de inventario y punto de venta para negocios que necesitan gestionar stock, ventas y reportes con una interfaz pensada para uso rápido y táctil.
 
 Actualmente incluye:
 
@@ -15,7 +15,7 @@ Actualmente incluye:
 - reportes de inventario y ventas
 - interfaz gráfica con PyQt5
 - flujo de pago simplificado con selección numérica
-- detección automática de modo oscuro según el sistema
+- modo oscuro
 
 ## Estado actual
 
@@ -37,7 +37,6 @@ La interfaz gráfica actual incluye varias mejoras orientadas a rapidez y ergono
   - 2 = Tarjeta
   - 3 = Transferencia
 - botón de pago, vaciar carrito y eliminar producto con tamaños ampliados
-- detección automática de modo oscuro basado en el sistema
 
 ## Requisitos
 
