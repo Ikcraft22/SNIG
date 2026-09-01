@@ -140,6 +140,15 @@ MYSQL_DATABASE=inventario_general
 - interfaz gráfica potente y adaptable a diferentes tamaños de pantalla
 - modo oscuro automático
 
+## CRUD
+
+| Operación | Método | Descripción |
+|-----------|--------|-------------|
+| **Create** | `registrar_producto()`, `agregar_presentacion()`, `registrar_movimiento()` | Crea productos, presentaciones y movimientos de inventario |
+| **Read** | `obtener_producto_por_gtin()`, `obtener_productos()`, `obtener_stock()`, `historial_movimientos()`, `reporte_general()` | Consulta productos, stock e historial |
+| **Update** | Actualización de `stock_actual` al registrar movimientos | Modifica el stock al registrar entradas, salidas y ajustes |
+| **Delete** | `eliminar_producto()` | Elimina un producto y sus ítems de venta relacionados |
+
 ## Solución de problemas rápidos
 
 ### PyQt5 no está instalado
