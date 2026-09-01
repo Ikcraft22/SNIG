@@ -19,7 +19,7 @@ try:
             QInputDialog, QAction, QMenu,
         QMessageBox, QTabWidget, QListWidget, QListWidgetItem,
         QPlainTextEdit, QSplitter, QStatusBar, QFormLayout, QStackedWidget,
-        QSizePolicy, QHeaderView
+            QSizePolicy, QHeaderView, QSlider
     )
     from PyQt5.QtCore import Qt, QSize, QTimer, QEvent
     from PyQt5.QtGui import QIcon, QFont, QColor
@@ -33,6 +33,7 @@ from core.barcode_scanner import EscanerProducto
 from core.inventory_manager import GestorInventario
 from core.pos_manager import GestorPOS
 from config.settings import PRESENTACIONES, MONEDA
+from ui.switch_dia_noche import SwitchDiaNoche
 
 logger = logging.getLogger(__name__)
 
@@ -88,25 +89,17 @@ class VentanaPrincipal(QMainWindow):
         self.escaneo = EscanerProducto()
         self._ultimo_producto_carrito_key = None
         self._repeticiones_mismo_producto = 0
+        self.modo_oscuro = False
+        self._indice_pestana_activa = 1
         
         # Crear interfaz
         self.crear_ui()
 
-    def _modo_oscuro_del_sistema(self):
-        """Devuelve True si el sistema está en modo oscuro."""
-        app = QApplication.instance()
-        if app is None:
-            return False
-        try:
-            return app.styleHints().colorScheme() == Qt.ColorScheme.Dark
-        except Exception:
-            return False
-    
     def crear_ui(self):
         """Crea la interfaz de usuario"""
         widget_central = QWidget()
         self.setCentralWidget(widget_central)
-        modo_oscuro = self._modo_oscuro_del_sistema()
+        modo_oscuro = self.modo_oscuro
 
         if modo_oscuro:
             self.setStyleSheet(
@@ -119,6 +112,14 @@ class VentanaPrincipal(QMainWindow):
                 "QStatusBar { background-color: #f2f3f5; color: #2c3e50; }"
             )
         
+        # Selector manual de tema animado (Día / Noche)
+        barra_superior = QHBoxLayout()
+        barra_superior.setContentsMargins(0, 0, 8, 6)
+        barra_superior.addStretch(1)
+        self.interruptor_tema = SwitchDiaNoche(checked=modo_oscuro, width=96, height=42)
+        self.interruptor_tema.toggled.connect(self.cambiar_tema)
+        barra_superior.addWidget(self.interruptor_tema)
+
         # Crear pestañas
         self.pestanas = QTabWidget()
         if modo_oscuro:
@@ -180,35 +181,73 @@ class VentanaPrincipal(QMainWindow):
         self.pestanas.tabBar().setTabVisible(self.pestanas.indexOf(self.pestana_logs), False)
         
         # Mostrar POS como primera pestaña activa
-        self.pestanas.setCurrentIndex(1)
+        self.pestanas.setCurrentIndex(self._indice_pestana_activa)
         self.pestanas.currentChanged.connect(self._enfocar_gtin_pos_si_corresponde)
         
         layout = QVBoxLayout()
+        layout.addLayout(barra_superior)
         layout.addWidget(self.pestanas)
         widget_central.setLayout(layout)
         
         # Barra de estado
         self.statusBar().showMessage("Listo")
         QTimer.singleShot(0, self.showMaximized)
+
+    def cambiar_tema(self, estado):
+        """Cambia manualmente entre tema claro y oscuro."""
+        nuevo_modo_oscuro = bool(estado)
+        if nuevo_modo_oscuro == self.modo_oscuro:
+            return
+
+        self._indice_pestana_activa = self.pestanas.currentIndex()
+        self.modo_oscuro = nuevo_modo_oscuro
+        self.crear_ui()
+        self.configurar_logger_grafico()
     
     def crear_pestaña_inventario(self) -> QWidget:
         """Crea la pestaña de inventario"""
         widget = QWidget()
+        if self.modo_oscuro:
+            fondo = "#121722"
+            superficie = "#1c2434"
+            campo = "#202b3d"
+            texto = "#f3f6fb"
+            texto_secundario = "#c5cfdd"
+            borde = "#40506a"
+            encabezado = "#26344a"
+            alterno = "#182233"
+        else:
+            fondo = "#f2f3f5"
+            superficie = "#ffffff"
+            campo = "#ffffff"
+            texto = "#202938"
+            texto_secundario = "#344054"
+            borde = "#c8ccd1"
+            encabezado = "#f4f6f8"
+            alterno = "#f8fafc"
+
         widget.setStyleSheet(
-            "QWidget { background-color: #f2f3f5; }"
-            "QLabel { font-size: 15px; color: #2c3e50; }"
-            "QLineEdit { padding: 12px; font-size: 15px; min-height: 46px; border: 1px solid #ced4da; border-radius: 8px; }"
-            "QPushButton { padding: 12px 16px; font-size: 15px; min-height: 46px; border-radius: 8px; }"
-            "QPushButton#primaryButton { background-color: #49689b; color: white; border: none; }"
-            "QPushButton#secondaryButton { background-color: white; border: 1px solid #c8ccd1; color: #2c3e50; }"
-            "QHeaderView::section { background-color: #f4f6f8; font-weight: bold; font-size: 15px; border: none; }"
+            f"QWidget {{ background-color: {fondo}; color: {texto}; }}"
+            f"QLabel {{ font-size: 15px; color: {texto}; }}"
+            f"QLineEdit {{ padding: 12px; font-size: 15px; min-height: 46px; background-color: {campo}; color: {texto}; border: 1px solid {borde}; border-radius: 8px; }}"
+            f"QLineEdit::placeholder {{ color: {texto_secundario}; }}"
+            "QPushButton { padding: 10px 16px; font-size: 15px; min-height: 46px; border-radius: 8px; text-align: center; }"
+            "QPushButton#primaryButton { background-color: #49689b; color: #ffffff; border: none; }"
+            "QPushButton#primaryButton:hover { background-color: #5b7db5; }"
+            f"QPushButton#secondaryButton {{ background-color: {superficie}; border: 1px solid {borde}; color: {texto}; }}"
+            f"QHeaderView::section {{ background-color: {encabezado}; color: {texto}; font-weight: bold; font-size: 15px; border: none; }}"
+            f"QTableWidget {{ background-color: {superficie}; alternate-background-color: {alterno}; color: {texto}; gridline-color: {borde}; border: 1px solid {borde}; }}"
+            f"QTableWidget::item {{ color: {texto}; }}"
+            "QTableWidget::item:selected { background-color: #49689b; color: #ffffff; }"
         )
         layout = QVBoxLayout()
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(12)
 
         cabecera = QWidget()
-        cabecera.setStyleSheet("background-color: white; border: 1px solid #d0d0d0; border-radius: 12px;")
+        cabecera.setStyleSheet(
+            f"background-color: {superficie}; border: 1px solid {borde}; border-radius: 12px;"
+        )
         layout_cabecera = QHBoxLayout(cabecera)
         layout_cabecera.setContentsMargins(16, 14, 16, 14)
         layout_cabecera.setSpacing(12)
@@ -221,21 +260,18 @@ class VentanaPrincipal(QMainWindow):
         self.entrada_gtin.setMinimumHeight(42)
         layout_cabecera.addWidget(self.entrada_gtin, 1)
 
+        _btn_style = "padding: 10px 16px; font-size: 15px; min-height: 46px; border-radius: 8px;"
         btn_buscar = QPushButton("🔍 Buscar")
-        btn_buscar.setObjectName("primaryButton")
         btn_buscar.setFixedWidth(240)
         btn_buscar.setMinimumHeight(48)
-        btn_buscar.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        btn_buscar.setStyleSheet(btn_buscar.styleSheet() + " text-align: left; padding-left: 20px; font-size: 15px;")
+        btn_buscar.setStyleSheet(_btn_style + "background-color: #49689b; color: #ffffff; border: none;")
         btn_buscar.clicked.connect(self.buscar_producto)
         layout_cabecera.addWidget(btn_buscar)
 
-        btn_ver_todos = QPushButton("📋 Ver Todos")
-        btn_ver_todos.setObjectName("secondaryButton")
+        btn_ver_todos = QPushButton("📋  Ver todos")
         btn_ver_todos.setFixedWidth(240)
         btn_ver_todos.setMinimumHeight(48)
-        btn_ver_todos.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        btn_ver_todos.setStyleSheet(btn_ver_todos.styleSheet() + " text-align: left; padding-left: 20px; font-size: 15px;")
+        btn_ver_todos.setStyleSheet(_btn_style + f"background-color: {superficie}; border: 1px solid {borde}; color: {texto};")
         btn_ver_todos.clicked.connect(self.ver_todos_productos)
         layout_cabecera.addWidget(btn_ver_todos)
 
@@ -246,7 +282,9 @@ class VentanaPrincipal(QMainWindow):
 
         panel_tabla = QWidget()
         panel_tabla.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        panel_tabla.setStyleSheet("background-color: white; border: 1px solid #d0d0d0; border-radius: 12px;")
+        panel_tabla.setStyleSheet(
+            f"background-color: {superficie}; border: 1px solid {borde}; border-radius: 12px;"
+        )
         layout_panel_tabla = QVBoxLayout(panel_tabla)
         layout_panel_tabla.setContentsMargins(16, 16, 16, 16)
         layout_panel_tabla.setSpacing(12)
@@ -276,7 +314,9 @@ class VentanaPrincipal(QMainWindow):
         contenido.addWidget(panel_tabla, 3)
 
         panel_acciones = QWidget()
-        panel_acciones.setStyleSheet("background-color: white; border: 1px solid #d0d0d0; border-radius: 12px;")
+        panel_acciones.setStyleSheet(
+            f"background-color: {superficie}; border: 1px solid {borde}; border-radius: 12px;"
+        )
         panel_acciones.setFixedWidth(240)
         layout_panel_acciones = QVBoxLayout(panel_acciones)
         layout_panel_acciones.setContentsMargins(16, 16, 16, 16)
@@ -286,24 +326,25 @@ class VentanaPrincipal(QMainWindow):
         label_acciones.setStyleSheet("font-weight: bold; font-size: 14px;")
         layout_panel_acciones.addWidget(label_acciones)
 
-        btn_nuevo = QPushButton("➕ Nuevo Producto")
-        btn_nuevo.setObjectName("primaryButton")
+        _panel_btn_base = "padding: 10px 14px; font-size: 14px; min-height: 44px; border-radius: 8px; text-align: left;"
+        btn_nuevo = QPushButton("➕  Agregar producto")
         btn_nuevo.setMinimumWidth(180)
         btn_nuevo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        btn_nuevo.setStyleSheet(_panel_btn_base + "background-color: #49689b; color: #ffffff; border: none;")
         btn_nuevo.clicked.connect(self.abrir_dialogo_nuevo_producto)
         layout_panel_acciones.addWidget(btn_nuevo)
 
         btn_entrada = QPushButton("➡️ Entrada de Stock")
-        btn_entrada.setObjectName("secondaryButton")
         btn_entrada.setMinimumWidth(180)
         btn_entrada.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        btn_entrada.setStyleSheet(_panel_btn_base + f"background-color: {superficie}; border: 1px solid {borde}; color: {texto};")
         btn_entrada.clicked.connect(self.registrar_entrada)
         layout_panel_acciones.addWidget(btn_entrada)
 
         btn_salida = QPushButton("⬅️ Salida de Stock")
-        btn_salida.setObjectName("secondaryButton")
         btn_salida.setMinimumWidth(180)
         btn_salida.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        btn_salida.setStyleSheet(_panel_btn_base + f"background-color: {superficie}; border: 1px solid {borde}; color: {texto};")
         btn_salida.clicked.connect(self.registrar_salida)
         layout_panel_acciones.addWidget(btn_salida)
 
@@ -319,20 +360,31 @@ class VentanaPrincipal(QMainWindow):
     def crear_pestaña_pos(self) -> QWidget:
         """Crea la pestaña de punto de venta"""
         widget = QWidget()
-        widget.setStyleSheet("QWidget { background-color: #f7f7f7; } QLabel { font-size: 12px; } QLineEdit { padding: 8px; font-size: 13px; } QPushButton { padding: 8px 10px; }")
+        if self.modo_oscuro:
+            fondo, superficie, texto, borde = "#121722", "#1c2434", "#f3f6fb", "#40506a"
+        else:
+            fondo, superficie, texto, borde = "#f7f7f7", "#ffffff", "#202938", "#d0d0d0"
+        widget.setStyleSheet(
+            f"QWidget {{ background-color: {fondo}; color: {texto}; }}"
+            f"QLabel {{ font-size: 12px; color: {texto}; }}"
+            f"QLineEdit {{ padding: 8px; font-size: 13px; background-color: {superficie}; color: {texto}; border: 1px solid {borde}; }}"
+            "QPushButton { padding: 8px 10px; }"
+        )
         layout_principal = QVBoxLayout()
         layout_principal.setContentsMargins(12, 12, 12, 12)
         layout_principal.setSpacing(10)
 
         # Barra superior: escáner / GTIN
         contenedor_busqueda = QWidget()
-        contenedor_busqueda.setStyleSheet("background-color: white; border: 1px solid #d0d0d0; border-radius: 6px; padding: 8px;")
+        contenedor_busqueda.setStyleSheet(
+            f"background-color: {superficie}; border: 1px solid {borde}; border-radius: 6px; padding: 8px;"
+        )
         layout_busqueda = QVBoxLayout(contenedor_busqueda)
         layout_busqueda.setContentsMargins(10, 10, 10, 10)
         layout_busqueda.setSpacing(6)
 
         label_busqueda = QLabel("Escanea o ingresa el GTIN")
-        label_busqueda.setStyleSheet("font-weight: bold; color: #2c3e50;")
+        label_busqueda.setStyleSheet(f"font-weight: bold; color: {texto};")
         layout_busqueda.addWidget(label_busqueda)
 
         self.entrada_gtin_pos = QLineEdit()
@@ -354,7 +406,7 @@ class VentanaPrincipal(QMainWindow):
         layout_derecha.setSpacing(8)
 
         label_carrito = QLabel("Carrito de Compra")
-        label_carrito.setStyleSheet("font-weight: bold; color: #2c3e50;")
+        label_carrito.setStyleSheet(f"font-weight: bold; color: {texto};")
         layout_derecha.addWidget(label_carrito)
 
         self.tabla_carrito = QTableWidget()
@@ -366,12 +418,39 @@ class VentanaPrincipal(QMainWindow):
         self.tabla_carrito.setSelectionBehavior(QTableWidget.SelectRows)
         self.tabla_carrito.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabla_carrito.setMinimumHeight(260)
+        self.tabla_carrito.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # Columnas reactivas al ancho de la ventana
+        self.tabla_carrito.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.tabla_carrito.horizontalHeader().setStretchLastSection(True)
+        # Estilo con soporte para modo oscuro / claro
+        if self.modo_oscuro:
+            alt_bg = "#1e2d45"
+            sel_bg = "#2563eb"
+            header_bg = "#1c2434"
+            header_text = "#f3f6fb"
+            grid_color = "#40506a"
+        else:
+            alt_bg = "#f0f4ff"
+            sel_bg = "#dbeafe"
+            header_bg = "#e8edf5"
+            header_text = "#202938"
+            grid_color = "#d0d0d0"
+        self.tabla_carrito.setStyleSheet(
+            f"QTableWidget {{ background-color: {superficie}; color: {texto}; "
+            f"  gridline-color: {grid_color}; font-size: 13px; border: none; }}"
+            f"QTableWidget::item {{ padding: 6px; }}"
+            f"QTableWidget::item:alternate {{ background-color: {alt_bg}; }}"
+            f"QTableWidget::item:selected {{ background-color: {sel_bg}; color: {texto}; }}"
+            f"QHeaderView::section {{ background-color: {header_bg}; color: {header_text}; "
+            f"  font-size: 13px; font-weight: bold; padding: 6px; "
+            f"  border: 1px solid {grid_color}; }}"
+        )
         layout_derecha.addWidget(self.tabla_carrito)
 
         layout_resumen = QVBoxLayout()
         self.label_subtotal = QLabel(f"Subtotal: {MONEDA}0.00")
         self.label_total = QLabel(f"Total: {MONEDA}0.00")
-        self.label_subtotal.setStyleSheet("font-size: 13px; color: #34495e;")
+        self.label_subtotal.setStyleSheet(f"font-size: 13px; color: {texto};")
         self.label_total.setStyleSheet("font-size: 14px; font-weight: bold; color: #27ae60;")
         layout_resumen.addWidget(self.label_subtotal)
         layout_resumen.addWidget(self.label_total)
@@ -423,17 +502,27 @@ class VentanaPrincipal(QMainWindow):
     def crear_pestaña_reportes(self) -> QWidget:
         """Crea la pestaña de reportes"""
         widget = QWidget()
-        widget.setStyleSheet("QWidget { background-color: #f7f7f7; } QLabel { font-size: 13px; } QPushButton { padding: 10px 12px; font-size: 13px; min-height: 38px; }")
+        if self.modo_oscuro:
+            fondo, superficie, texto, borde = "#121722", "#1c2434", "#f3f6fb", "#40506a"
+        else:
+            fondo, superficie, texto, borde = "#f7f7f7", "#ffffff", "#202938", "#d0d0d0"
+        widget.setStyleSheet(
+            f"QWidget {{ background-color: {fondo}; color: {texto}; }}"
+            f"QLabel {{ font-size: 13px; color: {texto}; }}"
+            "QPushButton { padding: 10px 12px; font-size: 13px; min-height: 38px; }"
+        )
         layout = QVBoxLayout()
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(10)
 
         encabezado = QLabel("📊 Reportes del Sistema")
-        encabezado.setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50;")
+        encabezado.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {texto};")
         layout.addWidget(encabezado)
 
         contenedor_botones = QWidget()
-        contenedor_botones.setStyleSheet("background-color: white; border: 1px solid #d0d0d0; border-radius: 8px; padding: 8px;")
+        contenedor_botones.setStyleSheet(
+            f"background-color: {superficie}; border: 1px solid {borde}; border-radius: 8px; padding: 8px;"
+        )
         botones_layout = QVBoxLayout(contenedor_botones)
         botones_layout.setSpacing(8)
 
@@ -453,7 +542,9 @@ class VentanaPrincipal(QMainWindow):
 
         self.texto_reporte = QLabel()
         self.texto_reporte.setWordWrap(True)
-        self.texto_reporte.setStyleSheet("background-color: white; border: 1px solid #d0d0d0; border-radius: 8px; padding: 10px; color: #34495e;")
+        self.texto_reporte.setStyleSheet(
+            f"background-color: {superficie}; border: 1px solid {borde}; border-radius: 8px; padding: 10px; color: {texto};"
+        )
         self.texto_reporte.setMinimumHeight(220)
         layout.addWidget(self.texto_reporte)
 
@@ -488,19 +579,29 @@ class VentanaPrincipal(QMainWindow):
     def crear_pestaña_logs(self) -> QWidget:
         """Crea la pestaña de logs de la aplicación"""
         widget = QWidget()
-        widget.setStyleSheet("QWidget { background-color: #f7f7f7; } QLabel { font-size: 13px; } QPlainTextEdit { font-size: 12px; padding: 8px; }")
+        if self.modo_oscuro:
+            fondo, superficie, texto, borde = "#121722", "#1c2434", "#f3f6fb", "#40506a"
+        else:
+            fondo, superficie, texto, borde = "#f7f7f7", "#ffffff", "#202938", "#d0d0d0"
+        widget.setStyleSheet(
+            f"QWidget {{ background-color: {fondo}; color: {texto}; }}"
+            f"QLabel {{ font-size: 13px; color: {texto}; }}"
+            f"QPlainTextEdit {{ font-size: 12px; padding: 8px; background-color: {superficie}; color: {texto}; border: 1px solid {borde}; }}"
+        )
         layout = QVBoxLayout()
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(10)
 
         encabezado = QLabel("📘 Registro de actividad")
-        encabezado.setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50;")
+        encabezado.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {texto};")
         layout.addWidget(encabezado)
 
         self.log_widget = QPlainTextEdit()
         self.log_widget.setReadOnly(True)
         self.log_widget.setLineWrapMode(QPlainTextEdit.NoWrap)
-        self.log_widget.setStyleSheet("background-color: white; border: 1px solid #d0d0d0; border-radius: 8px; padding: 8px;")
+        self.log_widget.setStyleSheet(
+            f"background-color: {superficie}; border: 1px solid {borde}; border-radius: 8px; padding: 8px; color: {texto};"
+        )
         self.log_widget.setMinimumHeight(360)
         layout.addWidget(self.log_widget)
 

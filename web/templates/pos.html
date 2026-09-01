@@ -141,9 +141,26 @@
             color: #999;
             padding: 2rem;
         }
-    </style>
+    <link rel="stylesheet" href="/static/css/switch.css">
 </head>
 <body>
+    <div style="max-width: 1400px; margin: 0 auto 1.5rem auto; display: flex; justify-content: flex-end; align-items: center; gap: 1.5rem;">
+        <label class="switch" for="theme-switch" title="Cambiar modo claro / oscuro">
+            <input type="checkbox" id="theme-switch" />
+            <div class="sunmoon">
+                <div class="darkside"></div>
+            </div>
+            <div class="border"></div>
+            <div class="clouds">
+                <img src="/static/img/cloud_1.svg" alt="" class="cloud cloud-1" />
+                <img src="/static/img/cloud_2.svg" alt="" class="cloud cloud-2" />
+                <img src="/static/img/cloud_3.svg" alt="" class="cloud cloud-3" />
+                <img src="/static/img/cloud_4.svg" alt="" class="cloud cloud-4" />
+                <img src="/static/img/stars.svg" alt="" class="stars" />
+            </div>
+        </label>
+        <button class="btn" style="margin: 0;" onclick="location.href='/'">⬅️ Volver al Inicio</button>
+    </div>
     <div class="container">
         <!-- Panel Izquierdo: Búsqueda de Productos -->
         <div class="panel">
@@ -167,7 +184,6 @@
             </div>
             
             <button class="btn btn-primary" onclick="agregarCarrito()">➕ Agregar al Carrito</button>
-            <button class="btn" onclick="location.href='/'">⬅️ Volver</button>
         </div>
         
         <!-- Panel Derecho: Carrito -->
@@ -315,6 +331,24 @@
         
         // Inicializar carrito
         actualizarCarrito();
+
+        const themeSwitch = document.getElementById('theme-switch');
+        const currentTheme = localStorage.getItem('theme');
+        if (currentTheme === 'dark') {
+            document.body.classList.add('dark');
+            if (themeSwitch) themeSwitch.checked = true;
+        }
+        if (themeSwitch) {
+            themeSwitch.addEventListener('change', function(e) {
+                if (e.target.checked) {
+                    document.body.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.body.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
+                }
+            });
+        }
     </script>
 </body>
 </html>

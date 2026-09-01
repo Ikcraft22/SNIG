@@ -117,17 +117,34 @@
             padding: 1rem;
             border-radius: 5px;
             margin-bottom: 1rem;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/switch.css">
 </head>
 <body>
     <div class="container">
-        <h1>📦 Gestión de Inventario</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+            <h1 style="margin-bottom: 0; padding-bottom: 0; border-bottom: none;">📦 Gestión de Inventario</h1>
+            <div style="display: flex; align-items: center; gap: 1.5rem;">
+                <label class="switch" for="theme-switch" title="Cambiar modo claro / oscuro">
+                    <input type="checkbox" id="theme-switch" />
+                    <div class="sunmoon">
+                        <div class="darkside"></div>
+                    </div>
+                    <div class="border"></div>
+                    <div class="clouds">
+                        <img src="/static/img/cloud_1.svg" alt="" class="cloud cloud-1" />
+                        <img src="/static/img/cloud_2.svg" alt="" class="cloud cloud-2" />
+                        <img src="/static/img/cloud_3.svg" alt="" class="cloud cloud-3" />
+                        <img src="/static/img/cloud_4.svg" alt="" class="cloud cloud-4" />
+                        <img src="/static/img/stars.svg" alt="" class="stars" />
+                    </div>
+                </label>
+                <button class="btn" onclick="location.href='/'">⬅️ Volver</button>
+            </div>
+        </div>
         
         <div class="search-box">
             <input type="text" id="gtin-input" placeholder="Escanea o ingresa GTIN..." autofocus>
             <button onclick="buscarProducto()">🔍 Buscar</button>
-            <button onclick="location.href='/'">⬅️ Volver</button>
         </div>
         
         <div id="error-msg" class="error" style="display: none;"></div>
@@ -228,6 +245,24 @@
                 buscarProducto();
             }
         });
+
+        const themeSwitch = document.getElementById('theme-switch');
+        const currentTheme = localStorage.getItem('theme');
+        if (currentTheme === 'dark') {
+            document.body.classList.add('dark');
+            if (themeSwitch) themeSwitch.checked = true;
+        }
+        if (themeSwitch) {
+            themeSwitch.addEventListener('change', function(e) {
+                if (e.target.checked) {
+                    document.body.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.body.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
+                }
+            });
+        }
     </script>
 </body>
 </html>

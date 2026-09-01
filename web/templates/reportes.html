@@ -94,11 +94,30 @@
             text-align: center;
             color: #3182ce;
         }
-    </style>
+    <link rel="stylesheet" href="/static/css/switch.css">
 </head>
 <body>
     <div class="container">
-        <h1>📊 Reportes</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+            <h1 style="margin-bottom: 0; padding-bottom: 0; border-bottom: none;">📊 Reportes</h1>
+            <div style="display: flex; align-items: center; gap: 1.5rem;">
+                <label class="switch" for="theme-switch" title="Cambiar modo claro / oscuro">
+                    <input type="checkbox" id="theme-switch" />
+                    <div class="sunmoon">
+                        <div class="darkside"></div>
+                    </div>
+                    <div class="border"></div>
+                    <div class="clouds">
+                        <img src="/static/img/cloud_1.svg" alt="" class="cloud cloud-1" />
+                        <img src="/static/img/cloud_2.svg" alt="" class="cloud cloud-2" />
+                        <img src="/static/img/cloud_3.svg" alt="" class="cloud cloud-3" />
+                        <img src="/static/img/cloud_4.svg" alt="" class="cloud cloud-4" />
+                        <img src="/static/img/stars.svg" alt="" class="stars" />
+                    </div>
+                </label>
+                <button class="back-btn" style="margin-top: 0;" onclick="location.href='/'">⬅️ Volver</button>
+            </div>
+        </div>
         
         <div class="reportes-grid" id="reportes-container">
             <div class="reporte-card">
@@ -196,6 +215,24 @@
             cargarReporteVentas();
             cargarStockBajo();
         }, 30000);
+
+        const themeSwitch = document.getElementById('theme-switch');
+        const currentTheme = localStorage.getItem('theme');
+        if (currentTheme === 'dark') {
+            document.body.classList.add('dark');
+            if (themeSwitch) themeSwitch.checked = true;
+        }
+        if (themeSwitch) {
+            themeSwitch.addEventListener('change', function(e) {
+                if (e.target.checked) {
+                    document.body.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.body.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
+                }
+            });
+        }
     </script>
 </body>
 </html>

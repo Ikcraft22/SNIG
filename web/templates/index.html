@@ -114,14 +114,32 @@
             padding: 1rem;
             margin-top: auto;
         }
-    </style>
+    <link rel="stylesheet" href="/static/css/switch.css">
 </head>
 <body>
     <nav>
-        <a href="/">🏠 Inicio</a>
-        <a href="/inventario">📦 Inventario</a>
-        <a href="/pos">🛒 POS</a>
-        <a href="/reportes">📊 Reportes</a>
+        <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+            <a href="/">🏠 Inicio</a>
+            <a href="/inventario">📦 Inventario</a>
+            <a href="/pos">🛒 POS</a>
+            <a href="/reportes">📊 Reportes</a>
+        </div>
+        <div class="theme-switch-wrapper">
+            <label class="switch" for="theme-switch" title="Cambiar modo claro / oscuro">
+                <input type="checkbox" id="theme-switch" />
+                <div class="sunmoon">
+                    <div class="darkside"></div>
+                </div>
+                <div class="border"></div>
+                <div class="clouds">
+                    <img src="/static/img/cloud_1.svg" alt="" class="cloud cloud-1" />
+                    <img src="/static/img/cloud_2.svg" alt="" class="cloud cloud-2" />
+                    <img src="/static/img/cloud_3.svg" alt="" class="cloud cloud-3" />
+                    <img src="/static/img/cloud_4.svg" alt="" class="cloud cloud-4" />
+                    <img src="/static/img/stars.svg" alt="" class="stars" />
+                </div>
+            </label>
+        </div>
     </nav>
     
     <div class="container">
@@ -147,5 +165,25 @@
     <footer>
         <p>&copy; 2025 Sistema de Inventario General | Versión 1.0</p>
     </footer>
+
+    <script>
+        const themeSwitch = document.getElementById('theme-switch');
+        const currentTheme = localStorage.getItem('theme');
+        if (currentTheme === 'dark') {
+            document.body.classList.add('dark');
+            if (themeSwitch) themeSwitch.checked = true;
+        }
+        if (themeSwitch) {
+            themeSwitch.addEventListener('change', function(e) {
+                if (e.target.checked) {
+                    document.body.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.body.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
+                }
+            });
+        }
+    </script>
 </body>
 </html>

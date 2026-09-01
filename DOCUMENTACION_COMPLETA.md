@@ -1342,6 +1342,10 @@ Este sistema proporciona una **solución profesional, completa y escalable** par
 
 ---
 
+## Agradecimientos
+
+- [opensource-coding/Dark-Light-Mode-Switch](https://github.com/opensource-coding/Dark-Light-Mode-Switch) — componente de interruptor de modo oscuro/claro integrado en la interfaz web del proyecto.
+
 **Última actualización**: 31 de mayo de 2026  
 **Versión**: 1.0.0  
 **Estado**: Producción  

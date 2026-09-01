@@ -172,6 +172,10 @@ pip install flask
 - pruebas automáticas
 - mejoras de sincronización y escalabilidad
 
+## Agradecimientos
+
+- [opensource-coding/Dark-Light-Mode-Switch](https://github.com/opensource-coding/Dark-Light-Mode-Switch) — por el componente de interruptor de modo oscuro/claro utilizado en la interfaz web del proyecto.
+
 ---
 
 Última actualización: 11 de agosto de 2026

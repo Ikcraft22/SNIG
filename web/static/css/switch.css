@@ -1,0 +1,256 @@
+/* Estilos del Switch Día / Noche basados en Dark-Light-Mode-Switch */
+:root {
+    --switch-width: 92px;
+    --switch-height: 40px;
+    --switch-round: 50px;
+    --switch-padding-x: 4px;
+    --switch-bg: linear-gradient(to bottom, #73bbff, #a2d1fd);
+    --switch-dark-bg: linear-gradient(to top, #2b3347, #181d27);
+    --border-width: 2px;
+    --border-gradient: linear-gradient(to bottom, #a2d1fd, #cde7ff);
+    --border-dark-gradient: linear-gradient(to bottom, #000000, #6c7384);
+    --sunmoon-size: 32px;
+    --transition: all 0.5s ease;
+}
+
+.theme-switch-wrapper {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--switch-width);
+    height: var(--switch-height);
+    border-radius: var(--switch-round);
+    cursor: pointer;
+    transition: var(--transition);
+    background: var(--switch-bg);
+    user-select: none;
+    box-sizing: border-box;
+}
+
+.switch::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: var(--switch-round);
+    opacity: 0;
+    background: var(--switch-dark-bg);
+    transition: var(--transition);
+}
+
+body.dark .switch::before {
+    opacity: 1;
+}
+
+.switch .border {
+    position: absolute;
+    top: calc(var(--border-width) * -1);
+    left: calc(var(--border-width) * -1);
+    width: calc(100% + var(--border-width) * 2);
+    height: calc(100% + var(--border-width) * 2);
+    border-radius: var(--switch-round);
+    background: var(--border-gradient);
+    z-index: 0;
+    transition: var(--transition);
+    pointer-events: none;
+}
+
+.switch .border::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: var(--switch-round);
+    background: var(--border-dark-gradient);
+    opacity: 0;
+    transition: var(--transition);
+}
+
+body.dark .switch .border::after {
+    opacity: 1;
+}
+
+.switch input {
+    display: none;
+}
+
+.sunmoon {
+    position: absolute;
+    width: var(--sunmoon-size);
+    height: var(--sunmoon-size);
+    border-radius: 50%;
+    transition: var(--transition);
+    left: var(--switch-padding-x);
+    z-index: 2;
+    background-color: #FFC187;
+    box-shadow: 0px 0px 8px 0px #FFC187, 0px 0px 14px 0px #ffc18768, -2px -2px 4px 0px #ffab5c inset;
+}
+
+body.dark .sunmoon {
+    left: calc(100% - var(--sunmoon-size) - var(--switch-padding-x));
+    background-color: #dee5f3;
+    box-shadow: 0px 0px 22px 0px #dee5f3;
+}
+
+.darkside {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 75%;
+    height: 75%;
+    border-radius: 50%;
+    background-color: #FFC187;
+    transition: var(--transition);
+}
+
+body.dark .darkside {
+    background-color: #565c6b;
+}
+
+.clouds {
+    border-radius: var(--switch-round);
+    position: relative;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.cloud {
+    position: absolute;
+    width: 60%;
+    transition: var(--transition);
+}
+
+.cloud-1 {
+    bottom: -55%;
+    left: 0;
+}
+
+.cloud-2 {
+    bottom: -45%;
+    left: 16px;
+}
+
+.cloud-3 {
+    bottom: -40%;
+    right: 0px;
+}
+
+.cloud-4 {
+    bottom: -16%;
+    right: -16px;
+}
+
+body.dark .cloud-1 {
+    bottom: -35%;
+    left: -75px;
+}
+
+body.dark .cloud-2 {
+    bottom: -15%;
+    left: -75px;
+    transition: all 0.7s ease;
+}
+
+body.dark .cloud-3 {
+    bottom: -15%;
+    right: -75px;
+}
+
+body.dark .cloud-4 {
+    bottom: -5%;
+    right: -75px;
+    transition: all 0.7s ease;
+}
+
+.stars {
+    position: absolute;
+    top: 150%;
+    left: 5px;
+    transform: translateY(-50%);
+    pointer-events: none;
+    transition: var(--transition);
+    width: 60%;
+}
+
+body.dark .stars {
+    top: 50%;
+}
+
+/* ==================== Estilos Globales de Modo Oscuro ==================== */
+body.dark {
+    background: linear-gradient(135deg, #121722 0%, #1a2233 100%) !important;
+    color: #eaf2ff;
+}
+
+body.dark nav {
+    background-color: rgba(14, 18, 27, 0.95);
+    border-bottom: 1px solid #2d3a4d;
+}
+
+body.dark .card,
+body.dark .container > div,
+body.dark .container {
+    background: #1c2434;
+    color: #eaf2ff;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+body.dark .panel {
+    background: #1c2434 !important;
+    color: #eaf2ff !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+body.dark .card h2,
+body.dark h1 {
+    color: #8bb5ff !important;
+    border-bottom-color: #3b4d66;
+}
+
+body.dark .card p {
+    color: #a0aec0;
+}
+
+body.dark input,
+body.dark select {
+    background: #121722;
+    color: #f3f6fb;
+    border: 1px solid #3b4d66;
+}
+
+body.dark table th {
+    background: #141b27;
+    color: #8bb5ff;
+}
+
+body.dark table td {
+    border-bottom-color: #26344a;
+    color: #eaf2ff;
+}
+
+body.dark table tr:hover {
+    background: #243044;
+}
+
+body.dark .resumen {
+    background: #141b27 !important;
+    border: 1px solid #2d3a4d;
+}
+
+body.dark footer {
+    background-color: rgba(14, 18, 27, 0.95);
+    color: #a0aec0;
+    border-top: 1px solid #2d3a4d;
+}
