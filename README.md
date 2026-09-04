@@ -1,6 +1,6 @@
 # Sistema de Inventario
 
-Documentación actualizada el 11 de agosto de 2026.
+Documentación actualizada el 4 de septiembre de 2026.
 
 ## Resumen del proyecto
 
@@ -15,12 +15,12 @@ Actualmente incluye:
 - reportes interactivos avanzados con Streamlit y Plotly (gráficos de barras, líneas, áreas, dona/pastel, treemaps, dispersión y exportación a Excel/CSV)
 - interfaz gráfica con PyQt5 y acceso en un clic a los reportes
 - flujo de pago simplificado con selección numérica
-- modo oscuro
+- modo oscuro / claro con memoria y persistencia automática entre sesiones
 
 ## Estado actual
 
-Versión actual: 1.0.3
-Estado: funcional y listo para uso local con GUI
+Versión actual: 1.1.0
+Estado: funcional y listo para uso local con GUI y Dashboard Streamlit
 
 ## Características principales de la GUI
 
@@ -37,6 +37,7 @@ La interfaz gráfica actual incluye varias mejoras orientadas a rapidez y ergono
   - 2 = Tarjeta
   - 3 = Transferencia
 - botón de pago, vaciar carrito y eliminar producto con tamaños ampliados
+- interruptor de tema animado (Día / Noche) con guardado automático del último modo usado
 
 ## Requisitos
 
@@ -44,6 +45,7 @@ La interfaz gráfica actual incluye varias mejoras orientadas a rapidez y ergono
 - pip
 - SQLite (incluido con Python)
 - PyQt5 para la interfaz gráfica
+- Streamlit y Plotly para el dashboard de reportes
 - Flask para la versión web
 
 ## Instalación rápida
@@ -63,11 +65,16 @@ pip install -r requirements.txt
 
 3. Ejecutar la aplicación
 
-```bash
-python main.py
-```
-
-La aplicación inicia por defecto la interfaz gráfica principal.
+- **Interfaz Gráfica Principal (PyQt5)**:
+  ```bash
+  python main.py
+  ```
+- **Dashboard de Reportes en Streamlit (Directo)**:
+  ```bash
+  python main.py --reportes
+  # o también:
+  streamlit run reporting/streamlit_reports.py
+  ```
 
 ## Uso recomendado
 
@@ -75,10 +82,10 @@ La aplicación inicia por defecto la interfaz gráfica principal.
 
 Desde la app se presentan estas pestañas principales:
 
-- Inventario
-- POS
-- Reportes
-- Logs (oculto por defecto y accesible desde reportes o acciones avanzadas)
+- 📦 Inventario
+- 🛒 POS
+- 📊 Reportes (con botón directo para lanzar el Dashboard de Streamlit en el navegador)
+- 📝 Logs (oculto por defecto y accesible desde reportes o acciones avanzadas)
 
 ### Flujo de POS
 

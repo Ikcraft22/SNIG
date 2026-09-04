@@ -1,12 +1,12 @@
 # Documentación completa del sistema
 
-Fecha de actualización: 11 de agosto de 2026
-Versión: 1.0.3
+Fecha de actualización: 4 de septiembre de 2026
+Versión: 1.1.0
 Estado: funcional
 
 ## 1. Introducción
 
-Este proyecto implementa un sistema de inventario y punto de venta para comercios minoristas. Está diseñado para funcionar localmente con SQLite por defecto y ofrece una interfaz gráfica moderna y táctil basada en PyQt5, además de una capa web con Flask.
+Este proyecto implementa un sistema de inventario y punto de venta para comercios minoristas. Está diseñado para funcionar localmente con SQLite por defecto y ofrece una interfaz gráfica moderna y táctil basada en PyQt5, un dashboard avanzado de analítica interactiva con Streamlit y Plotly, además de una capa web con Flask.
 
 ## 2. Objetivos del sistema
 
@@ -16,22 +16,25 @@ El sistema permite:
 - controlar stock por entradas, salidas y ajustes
 - registrar ventas y calcular totales automáticamente
 - consultar productos por GTIN
-- visualizar reportes de inventario y ventas
-- usar varias interfaces: GUI, terminal y web
-- trabajar con una experiencia optimizada para pantallas táctiles
+- generar reportes y analítica visual interactiva con múltiples tipos de gráficas (Streamlit + Plotly)
+- exportar reportes consolidados en formato Excel (`.xlsx`) y CSV
+- recordar automáticamente las preferencias de tema (Modo Oscuro / Claro)
+- usar varias interfaces: GUI (PyQt5), Dashboard de Reportes (Streamlit), terminal y web (Flask)
+- trabajar con una experiencia optimizada para pantallas táctiles y escritorios
 
 ## 3. Arquitectura general
 
 El proyecto está organizado por módulos:
 
-- config/: configuración global del sistema
-- database/: modelos SQLAlchemy y conexión a la base de datos
-- core/: lógica de negocio de inventario y POS
-- api/: integra servicios de validación y búsqueda de GTIN
-- ui/: interfaz gráfica y terminal
-- web/: aplicación Flask con rutas y endpoints
-- data/: datos locales y archivos auxiliares
-- tests/: pruebas del proyecto
+- `config/`: configuración global del sistema
+- `database/`: modelos SQLAlchemy y conexión a la base de datos
+- `core/`: lógica de negocio de inventario y POS
+- `reporting/`: módulo de analítica interactiva y dashboard con Streamlit y Plotly
+- `api/`: integra servicios de validación y búsqueda de GTIN
+- `ui/`: interfaz gráfica (PyQt5) y terminal
+- `web/`: aplicación Flask con rutas y endpoints
+- `data/`: datos locales y archivos auxiliares
+- `tests/`: pruebas del proyecto
 
 ## 4. Componentes principales
 
@@ -39,34 +42,50 @@ El proyecto está organizado por módulos:
 
 Se usa SQLAlchemy y por defecto SQLite. La base se guarda como:
 
-- inventario.db
+- `inventario.db`
 
 Modelos clave:
 
-- Producto
-- Presentacion
-- MovimientoInventario
-- Venta
-- VentaItem
-- Usuario
+- `Producto`
+- `Presentacion`
+- `MovimientoInventario`
+- `Venta`
+- `VentaItem`
+- `Usuario`
 
-### 4.2 Interfaz gráfica
+### 4.2 Interfaz gráfica (PyQt5)
 
-La GUI maneja tres pestañas principales:
+La GUI maneja pestañas principales:
 
-- Inventario
-- POS
-- Reportes
+- **📦 Inventario**: Catálogo de productos, stock en tiempo real, búsqueda y acciones rápidas.
+- **🛒 POS**: Punto de venta con escaneo de GTIN, carrito interactivo y cobro numérico rápido.
+- **📊 Reportes**: Resumen de indicadores y botón directo `🚀 Abrir Dashboard Gráfico en Streamlit`.
+- **📝 Logs**: Registro de actividad del sistema.
 
-Además, existe una pestaña auxiliar de Logs que puede mostrarse desde acciones internas o desde reportes.
+Incluye interruptor animado de tema Día / Noche con **persistencia automática de memoria** entre sesiones en `.startup_state.json`.
 
-### 4.3 Interfaz web
+### 4.3 Módulo de Reportes y Analítica (Streamlit + Plotly)
 
-La web se ejecuta con Flask y ofrece acceso HTTP a distintos endpoints del sistema.
+Ubicado en `reporting/streamlit_reports.py`, provee:
 
-### 4.4 APIs y servicios externos
+- **Panel de KPIs Principales**: Ingresos totales, volumen de ventas, ticket promedio, unidades en stock, valorización económica a costo/venta y alertas de reposición.
+- **Filtros Globales en Barra Lateral**: Selección por rango de fechas (Hoy, 7 días, 30 días, Este mes, Historial, Personalizado), método de pago, producto específico y umbral de alerta de stock.
+- **Múltiples Tipos de Gráficas Representadas**:
+  - *Barras verticales y horizontales* (ingresos, top productos, stock por categoría).
+  - *Líneas y Áreas* (evolución continua de ventas y flujo de movimientos).
+  - *Dona y Circular / Pastel* (distribución por método de pago y stock por presentación).
+  - *Treemaps (Mapas de árbol)* (jerarquía de valor e inventario).
+  - *Dispersión (Scatter), Diagramas de Cajas (Box Plots) e Histogramas* en el Explorador Gráfico Personalizado.
+- **Pestañas de Reportes**:
+  1. *📈 Ventas & Facturación*: Tendencias temporales, desglose por método de pago, ranking top 10 y visor de transacciones.
+  2. *📦 Inventario & Stock*: Existencias, valorización del almacén y semáforo de alerta crítica.
+  3. *🔄 Movimientos & Kardex*: Auditoría histórica de Entradas, Salidas y Ajustes.
+  4. *🎨 Explorador Gráfico Personalizado (Custom Chart Studio)*: Permite al usuario cruzar cualquier dimensión y métrica, y escoger libremente el tipo de gráfica a renderizar.
+  5. *📥 Centro de Exportación*: Generación y descarga de libro Excel (`.xlsx`) multitabla y archivos `.csv`.
 
-El proyecto puede consultar proveedores y servicios de GTIN, siempre que la configuración correspondiente esté habilitada.
+### 4.4 Interfaz web (Flask)
+
+La web se ejecuta con Flask (`web/app.py`) y ofrece acceso HTTP a distintos endpoints y vistas del sistema, incluyendo enlace directo al servidor Streamlit.
 
 ## 5. Configuración
 
@@ -90,19 +109,25 @@ MYSQL_DATABASE=inventario_general
 
 ## 6. Ejecución
 
-### Desde la terminal
+### 6.1 Interfaz Gráfica Principal (PyQt5)
 
 ```bash
 python main.py
 ```
 
-La aplicación inicia la interfaz gráfica principal de forma directa.
+### 6.2 Servidor de Reportes Streamlit Directo (CLI)
 
-### Desde la web
+```bash
+python main.py --reportes
+# o también:
+streamlit run reporting/streamlit_reports.py
+```
 
-1. ejecutar la app
-2. abrir la interfaz web desde Flask
-3. revisar la ruta configurada en la salida del programa
+### 6.3 Interfaz Web (Flask)
+
+```bash
+python -m web.app
+```
 
 ## 7. Funcionalidades actuales
 
@@ -124,28 +149,20 @@ La aplicación inicia la interfaz gráfica principal de forma directa.
 - selección del método de pago por número
 - eliminación y vaciado del carrito con botones grandes
 
-### Reportes
+### Reportes y Analítica
 
-- reporte de inventario
-- reporte de ventas
-- acceso a logs del sistema
-- visualización orientada a decisiones rápidas
+- dashboard interactivo en tiempo real con Streamlit y Plotly
+- gráficas interactivas dinámicas con zoom, tooltips y filtros
+- explorador multitipo de gráficas personalizadas
+- alertas de stock bajo y semáforo de reposición
+- descarga directa en Excel (`.xlsx`) y CSV
 
-## 8. Mejoras recientes de la UI
+## 8. Mejoras recientes
 
-La interfaz actual incorpora diversos refinamientos funcionales y visuales:
-
-- tamaño uniforme de pestañas y mejor distribución horizontal
-- tabla de inventario reactiva al ancho de la ventana
-- botones de acción más grandes para pantallas táctiles
-- diseño de inventario con barra de búsqueda y panel de acciones
-- eliminación del campo de cajero al completar el cobro
-- método de pago simplificado con opciones numeradas:
-  - 1 = Efectivo
-  - 2 = Tarjeta
-  - 3 = Transferencia
-- activación automática del foco en el campo GTIN del POS
-- detección de modo oscuro del sistema para la parte superior de la UI
+- **Integración de Streamlit & Plotly**: Módulo de reportes con múltiples tipos de gráficas y descarga en Excel/CSV.
+- **Memoria de Modo Oscuro**: El sistema recuerda automáticamente si la sesión previa estaba en modo claro u oscuro.
+- **Acceso Directo**: Botón en la GUI PyQt5 para abrir el dashboard en el navegador web con un clic.
+- **Lanzador CLI**: Parámetro `--reportes` / `--streamlit` añadido en `main.py`.
 
 ## 9. Observaciones técnicas
 

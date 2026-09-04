@@ -1,5 +1,25 @@
 # CHANGELOG - Historial de Cambios
 
+## [1.1.0] - 4 de septiembre de 2026
+
+### Agregado
+- ✅ **Dashboard interactivo de analítica con Streamlit y Plotly** (`reporting/streamlit_reports.py`):
+  - Métricas KPI en tiempo real (Ingresos totales, ticket promedio, unidades en stock, valorización económica a costo/venta, semáforo de alertas).
+  - Múltiples tipos de gráficas interactivas: Barras (verticales y horizontales), Líneas de tendencia, Áreas, Gráficos de Dona / Pastel, Treemaps (Mapas de árbol), Dispersión, Diagramas de Cajas e Histogramas.
+  - Pestañas de análisis: *Ventas & Facturación*, *Inventario & Stock*, *Movimientos & Kardex*, *Explorador Gráfico Personalizado (Custom Chart Studio)* y *Centro de Exportación*.
+  - Filtros dinámicos en barra lateral (por rango de fechas, método de pago, producto específico y umbral de alerta de stock).
+  - Exportación de reportes a libro **Excel (.xlsx)** multitabla y archivos **CSV**.
+- ✅ **Persistencia de tema (Modo Oscuro / Claro)**:
+  - La aplicación ahora guarda y recuerda automáticamente en `.startup_state.json` el último modo seleccionado por el usuario.
+- ✅ **Integración en GUI (PyQt5)**:
+  - Botón directo en la pestaña de Reportes para lanzar y abrir el dashboard en el navegador con un solo clic.
+- ✅ **Comandos CLI para Reportes**:
+  - Posibilidad de iniciar directamente el servidor de reportes con `python main.py --reportes` o `python main.py --streamlit`.
+- ✅ **Integración Web Flask**:
+  - Banner y enlace directo en `/reportes` hacia el servidor Streamlit.
+
+---
+
 ## [1.0.3] - 11 de agosto de 2026
 
 ### Actualizado

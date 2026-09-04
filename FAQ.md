@@ -76,11 +76,44 @@ MYSQL_DATABASE=inventario_general
 
 Sí. Al iniciar la aplicación se inicializa la estructura de tablas automáticamente.
 
+## ¿Cómo abro el dashboard interactivo de reportes con gráficas (Streamlit)?
+
+Tienes tres opciones fáciles:
+1. **Desde la GUI (PyQt5)**: Ve a la pestaña **📊 Reportes** y presiona el botón `🚀 Abrir Dashboard Gráfico en Streamlit`.
+2. **Desde la terminal**:
+   ```bash
+   python main.py --reportes
+   ```
+   o directamente:
+   ```bash
+   streamlit run reporting/streamlit_reports.py
+   ```
+3. **Desde la interfaz web (Flask)**: Ve a la sección `/reportes` y pulsa en el botón para abrir Streamlit.
+
+## ¿Qué tipos de gráficas están disponibles en los reportes?
+
+El dashboard soporta:
+- **Barras verticales y horizontales** (ventas, top productos, stock por categoría).
+- **Líneas y Áreas temporales** (evolución de ingresos y movimientos en el tiempo).
+- **Dona y Circular / Pastel** (distribución por método de pago y proporciones de stock).
+- **Treemaps (Mapas de árbol)** (volumen y valorización del catálogo).
+- **Dispersión, Cajas (Box Plots) e Histogramas** en el Explorador Gráfico Personalizado.
+
+## ¿Puedo exportar los reportes a Excel o CSV?
+
+Sí. En la pestaña **📥 Centro de Exportación** de Streamlit puedes descargar un libro completo de Excel (`.xlsx`) con hojas separadas para Ventas, Inventario y Movimientos, o descargar archivos `.csv` individuales con un clic.
+
+## ¿Cómo recuerda el sistema si estaba en modo oscuro o claro?
+
+La aplicación guarda automáticamente la preferencia en el archivo local `.startup_state.json` cada vez que accionas el interruptor de tema Día / Noche, recuperando el mismo modo al volver a abrir el programa.
+
 ## ¿Dónde está la lógica principal?
 
-- main.py: entrada del programa
-- core/: lógica de negocio
-- web/app.py: rutas y API web
-- database/models.py: modelos de datos
+- `main.py`: entrada del programa y lanzador CLI
+- `reporting/streamlit_reports.py`: dashboard de reportes interactivos con Streamlit y Plotly
+- `core/`: lógica de negocio (inventario, POS, escáner)
+- `ui/gui_ui.py`: interfaz gráfica con PyQt5
+- `web/app.py`: rutas y API web con Flask
+- `database/models.py`: modelos de datos SQLAlchemy
 
-**Última actualización**: 13 de julio de 2026
+**Última actualización**: 4 de septiembre de 2026
