@@ -45,3 +45,4 @@ dist/
 
 # Archivos de inicio propios de la app
 .startup_state.json
+.startup_state.json

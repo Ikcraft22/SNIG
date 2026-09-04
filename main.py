@@ -36,6 +36,7 @@ def ejecutar_interfaz_gui():
         hoy = date.today().isoformat()
         mostrar_splash = True
 
+        datos = {}
         if estado_archivo.exists():
             try:
                 datos = json.loads(estado_archivo.read_text(encoding="utf-8"))
@@ -60,7 +61,8 @@ def ejecutar_interfaz_gui():
             else:
                 time.sleep(2.5)
 
-        estado_archivo.write_text(json.dumps({"last_run_date": hoy}), encoding="utf-8")
+        datos["last_run_date"] = hoy
+        estado_archivo.write_text(json.dumps(datos, indent=2), encoding="utf-8")
 
         interfaz = InterfazGUI(app)
         interfaz.ejecutar()
@@ -71,28 +73,26 @@ def ejecutar_interfaz_gui():
         logger.error(f"❌ Error al ejecutar interfaz gráfica: {e}")
         print(f"❌ Error: {e}")
 
+def ejecutar_reportes_streamlit():
+    """Ejecuta el servidor de reportes interactivos con Streamlit."""
+    import subprocess
+    script_path = Path(__file__).resolve().parent / "reporting" / "streamlit_reports.py"
+    print("\n🚀 Iniciando servidor de reportes interactivos con Streamlit...")
+    cmd = [sys.executable, "-m", "streamlit", "run", str(script_path)]
+    try:
+        subprocess.run(cmd)
+    except KeyboardInterrupt:
+        print("\n👋 Servidor de Streamlit detenido.")
+
 def main():
     """Función principal"""
     try:
-        # Arrancar siempre la interfaz gráfica (equivalente a seleccionar la opción 2)
+        if len(sys.argv) > 1 and sys.argv[1].lower() in ["--streamlit", "--reportes", "-r", "reportes"]:
+            ejecutar_reportes_streamlit()
+            return
+
+        # Arrancar siempre la interfaz gráfica por defecto
         ejecutar_interfaz_gui()
-        # Si en algún caso se desea el menú interactivo, descomentar el bloque siguiente
-        # while True:
-        #     mostrar_menu_principal()
-        #     opcion = input("\nSelecciona una opción (1-5): ").strip()
-        #     if opcion == "1":
-        #         ejecutar_interfaz_terminal()
-        #     elif opcion == "2":
-        #         ejecutar_interfaz_gui()
-        #     elif opcion == "3":
-        #         ejecutar_interfaz_web()
-        #     elif opcion == "4":
-        #         configurar_base_datos()
-        #     elif opcion == "5":
-        #         print("\n👋 ¡Hasta luego!")
-        #         break
-        #     else:
-        #         print("\n❌ Opción inválida. Intenta de nuevo.")
     
     except KeyboardInterrupt:
         print("\n\n👋 Aplicación interrumpida")

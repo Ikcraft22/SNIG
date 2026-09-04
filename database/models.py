@@ -136,6 +136,7 @@ class VentaItem(Base):
     # Relaciones
     venta = relationship("Venta", back_populates="items")
     producto = relationship("Producto", back_populates="ventas_items")
+    presentacion = relationship("Presentacion")
     
     def __repr__(self):
         return f"<VentaItem(cantidad={self.cantidad}, subtotal={self.subtotal})>"

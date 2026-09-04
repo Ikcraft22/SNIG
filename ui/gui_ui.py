@@ -6,7 +6,12 @@ Proporciona una interfaz visual profesional con:
 - Reportes en tiempo real
 """
 
+import sys
+import json
+import subprocess
+import webbrowser
 import logging
+from pathlib import Path
 from typing import Optional
 from datetime import datetime
 import random
@@ -89,8 +94,10 @@ class VentanaPrincipal(QMainWindow):
         self.escaneo = EscanerProducto()
         self._ultimo_producto_carrito_key = None
         self._repeticiones_mismo_producto = 0
-        self.modo_oscuro = False
+        self.archivo_estado = Path(__file__).resolve().parent.parent / ".startup_state.json"
+        self.modo_oscuro = self._cargar_modo_oscuro()
         self._indice_pestana_activa = 1
+        self.proceso_streamlit = None
         
         # Crear interfaz
         self.crear_ui()
@@ -193,14 +200,39 @@ class VentanaPrincipal(QMainWindow):
         self.statusBar().showMessage("Listo")
         QTimer.singleShot(0, self.showMaximized)
 
+    def _cargar_modo_oscuro(self) -> bool:
+        """Carga la preferencia de modo oscuro/claro guardada."""
+        if hasattr(self, "archivo_estado") and self.archivo_estado.exists():
+            try:
+                datos = json.loads(self.archivo_estado.read_text(encoding="utf-8"))
+                return bool(datos.get("modo_oscuro", False))
+            except Exception as e:
+                logger.warning(f"No se pudo cargar la preferencia de tema: {e}")
+        return False
+
+    def _guardar_modo_oscuro(self, modo_oscuro: bool):
+        """Guarda la preferencia de modo oscuro/claro en el archivo de estado."""
+        try:
+            datos = {}
+            if hasattr(self, "archivo_estado") and self.archivo_estado.exists():
+                try:
+                    datos = json.loads(self.archivo_estado.read_text(encoding="utf-8"))
+                except Exception:
+                    datos = {}
+            datos["modo_oscuro"] = bool(modo_oscuro)
+            self.archivo_estado.write_text(json.dumps(datos, indent=2), encoding="utf-8")
+        except Exception as e:
+            logger.error(f"Error al guardar preferencia de tema: {e}")
+
     def cambiar_tema(self, estado):
-        """Cambia manualmente entre tema claro y oscuro."""
+        """Cambia manualmente entre tema claro y oscuro y persiste la preferencia."""
         nuevo_modo_oscuro = bool(estado)
         if nuevo_modo_oscuro == self.modo_oscuro:
             return
 
         self._indice_pestana_activa = self.pestanas.currentIndex()
         self.modo_oscuro = nuevo_modo_oscuro
+        self._guardar_modo_oscuro(nuevo_modo_oscuro)
         self.crear_ui()
         self.configurar_logger_grafico()
     
@@ -500,7 +532,7 @@ class VentanaPrincipal(QMainWindow):
             QTimer.singleShot(0, self._enfocar_gtin_pos)
     
     def crear_pestaña_reportes(self) -> QWidget:
-        """Crea la pestaña de reportes"""
+        """Crea la pestaña de reportes con integración a Streamlit"""
         widget = QWidget()
         if self.modo_oscuro:
             fondo, superficie, texto, borde = "#121722", "#1c2434", "#f3f6fb", "#40506a"
@@ -509,15 +541,25 @@ class VentanaPrincipal(QMainWindow):
         widget.setStyleSheet(
             f"QWidget {{ background-color: {fondo}; color: {texto}; }}"
             f"QLabel {{ font-size: 13px; color: {texto}; }}"
-            "QPushButton { padding: 10px 12px; font-size: 13px; min-height: 38px; }"
+            "QPushButton { padding: 10px 12px; font-size: 13px; min-height: 38px; border-radius: 6px; }"
         )
         layout = QVBoxLayout()
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(10)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(12)
 
-        encabezado = QLabel("📊 Reportes del Sistema")
-        encabezado.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {texto};")
+        encabezado = QLabel("📊 Reportes y Analítica del Sistema")
+        encabezado.setStyleSheet(f"font-size: 17px; font-weight: bold; color: {texto};")
         layout.addWidget(encabezado)
+
+        # Botón destacado para Dashboard de Streamlit
+        btn_streamlit = QPushButton("🚀 Abrir Dashboard Gráfico en Streamlit (Múltiples Gráficas)")
+        btn_streamlit.setStyleSheet(
+            "QPushButton { background-color: #2563eb; color: #ffffff; font-weight: bold; font-size: 14px; min-height: 46px; border: none; border-radius: 8px; }"
+            "QPushButton:hover { background-color: #1d4ed8; }"
+            "QPushButton:pressed { background-color: #1e40af; }"
+        )
+        btn_streamlit.clicked.connect(self.abrir_dashboard_streamlit)
+        layout.addWidget(btn_streamlit)
 
         contenedor_botones = QWidget()
         contenedor_botones.setStyleSheet(
@@ -526,26 +568,26 @@ class VentanaPrincipal(QMainWindow):
         botones_layout = QVBoxLayout(contenedor_botones)
         botones_layout.setSpacing(8)
 
-        btn_reporte_inventario = QPushButton("📦 Reporte de Inventario")
+        btn_reporte_inventario = QPushButton("📦 Resumen Rápido de Inventario")
         btn_reporte_inventario.clicked.connect(self.generar_reporte_inventario)
         botones_layout.addWidget(btn_reporte_inventario)
 
-        btn_reporte_ventas = QPushButton("💳 Reporte de Ventas")
+        btn_reporte_ventas = QPushButton("💳 Resumen Rápido de Ventas")
         btn_reporte_ventas.clicked.connect(self.generar_reporte_ventas)
         botones_layout.addWidget(btn_reporte_ventas)
 
-        btn_logs = QPushButton("📝 Ver Logs")
+        btn_logs = QPushButton("📝 Ver Logs del Sistema")
         btn_logs.clicked.connect(self.abrir_logs_desde_reportes)
         botones_layout.addWidget(btn_logs)
 
         layout.addWidget(contenedor_botones)
 
-        self.texto_reporte = QLabel()
+        self.texto_reporte = QLabel("Selecciona un reporte rápido o abre el Dashboard en Streamlit para gráficos interactivos.")
         self.texto_reporte.setWordWrap(True)
         self.texto_reporte.setStyleSheet(
-            f"background-color: {superficie}; border: 1px solid {borde}; border-radius: 8px; padding: 10px; color: {texto};"
+            f"background-color: {superficie}; border: 1px solid {borde}; border-radius: 8px; padding: 12px; color: {texto}; font-size: 13px;"
         )
-        self.texto_reporte.setMinimumHeight(220)
+        self.texto_reporte.setMinimumHeight(180)
         layout.addWidget(self.texto_reporte)
 
         widget.setLayout(layout)
@@ -1091,6 +1133,41 @@ class VentanaPrincipal(QMainWindow):
         {chr(10).join([f"  {k}: {MONEDA}{v:.2f}" for k, v in reporte['metodos_pago'].items()])}
         """
         self.texto_reporte.setText(texto)
+
+    def abrir_dashboard_streamlit(self):
+        """Inicia el servidor Streamlit en segundo plano y abre el navegador web."""
+        url = "http://localhost:8501"
+        try:
+            import urllib.request
+            try:
+                urllib.request.urlopen(url, timeout=0.6)
+                webbrowser.open(url)
+                self.statusBar().showMessage("✅ Dashboard de Streamlit abierto en el navegador")
+                return
+            except Exception:
+                pass
+
+            script_path = Path(__file__).resolve().parent.parent / "reporting" / "streamlit_reports.py"
+            if not script_path.exists():
+                QMessageBox.warning(self, "Error", f"No se encontró el script de reportes en: {script_path}")
+                return
+
+            cmd = [
+                sys.executable, "-m", "streamlit", "run",
+                str(script_path),
+                "--server.headless", "true",
+                "--server.port", "8501"
+            ]
+            self.proceso_streamlit = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            self.statusBar().showMessage("🚀 Iniciando servidor de reportes en Streamlit...")
+            QTimer.singleShot(2000, lambda: webbrowser.open(url))
+        except Exception as e:
+            logger.error(f"❌ Error al iniciar Streamlit: {e}")
+            QMessageBox.warning(self, "Error", f"No se pudo iniciar el dashboard de Streamlit: {e}")
 
 
 class DialogoNuevoProducto(QDialog):

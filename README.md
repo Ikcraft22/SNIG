@@ -12,8 +12,8 @@ Actualmente incluye:
 - control de stock por entradas, salidas y ajustes
 - punto de venta con escaneo rápido por GTIN
 - carrito de compra y cálculo automático de totales
-- reportes de inventario y ventas
-- interfaz gráfica con PyQt5
+- reportes interactivos avanzados con Streamlit y Plotly (gráficos de barras, líneas, áreas, dona/pastel, treemaps, dispersión y exportación a Excel/CSV)
+- interfaz gráfica con PyQt5 y acceso en un clic a los reportes
 - flujo de pago simplificado con selección numérica
 - modo oscuro
 
