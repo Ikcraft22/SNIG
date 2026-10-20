@@ -13,7 +13,7 @@ from database.connection import SessionLocal, init_db
 from database.models import Producto
 from core.barcode_scanner import EscanerProducto
 from core.inventory_manager import GestorInventario
-from core.pos_manager import GestorPOS
+from core.pos_manager import GestorPOS, calcular_vuelto
 from api.gtin_lookup import GTINBuscador
 from config.settings import PRESENTACIONES, MONEDA
 
@@ -177,8 +177,8 @@ class InterfazTerminal:
         tipo_presentacion = opciones[idx][0]
         
         cantidad = int(input("Cantidad por envase: ") or "1")
-        precio_unitario = float(input("Precio de costo unitario: ") or "0")
-        precio_venta = float(input("Precio de venta: ") or "0")
+        precio_unitario = int(input("Precio de costo unitario: ") or "0")
+        precio_venta = int(input("Precio de venta: ") or "0")
         stock_inicial = int(input("Stock inicial: ") or "0")
         
         presentacion = self.inventario.agregar_presentacion(
@@ -218,7 +218,7 @@ class InterfazTerminal:
             
             print("\nPRESENTACIONES:")
             for p in producto.presentaciones:
-                print(f"  • {p.tipo.value}: {MONEDA}{p.precio_venta} - Stock: {p.stock_actual}")
+                print(f"  • {p.tipo.value}: {MONEDA}{p.precio_venta:.0f} - Stock: {p.stock_actual}")
         else:
             print(f"\n⚠️ Producto no encontrado: {gtin}")
             print("¿Deseas registrarlo? (s/n): ", end="")
@@ -372,7 +372,7 @@ class InterfazTerminal:
             print("=" * 70)
             
             resumen = self.pos.carrito.obtener_resumen()
-            print(f"\nCarrito: {resumen['cantidad_items']} items | Total: {MONEDA}{resumen['total']:.2f}")
+            print(f"\nCarrito: {resumen['cantidad_items']} items | Total: {MONEDA}{resumen['total']:.0f}")
             
             opciones = [
                 ("agregar", "➕ Agregar producto"),
@@ -415,7 +415,7 @@ class InterfazTerminal:
         
         print(f"\n✅ Producto: {producto.nombre}")
         print("\nPRESENTACIONES:")
-        opciones = [(p.id, f"{p.tipo.value} - {MONEDA}{p.precio_venta} (Stock: {p.stock_actual})") for p in producto.presentaciones]
+        opciones = [(p.id, f"{p.tipo.value} - {MONEDA}{p.precio_venta:.0f} (Stock: {p.stock_actual})") for p in producto.presentaciones]
         idx = self.seleccionar_opcion(opciones, prompt="Selecciona presentación")
         if idx is None:
             print("Operación cancelada")
@@ -455,13 +455,13 @@ class InterfazTerminal:
             for item in items:
                 print(f"\nProducto ID: {item['producto_id']}")
                 print(f"Cantidad: {item['cantidad']}")
-                print(f"Precio unitario: {MONEDA}{item['precio_unitario']:.2f}")
-                print(f"Subtotal: {MONEDA}{item['subtotal']:.2f}")
+                print(f"Precio unitario: {MONEDA}{item['precio_unitario']:.0f}")
+                print(f"Subtotal: {MONEDA}{item['subtotal']:.0f}")
             
             resumen = self.pos.carrito.obtener_resumen()
             print("\n" + "-" * 70)
-            print(f"Subtotal: {MONEDA}{resumen['subtotal']:.2f}")
-            print(f"TOTAL: {MONEDA}{resumen['total']:.2f}")
+            print(f"Subtotal: {MONEDA}{resumen['subtotal']:.0f}")
+            print(f"TOTAL: {MONEDA}{resumen['total']:.0f}")
             print("=" * 70)
         
         input("\nPresiona Enter...")
@@ -506,7 +506,7 @@ class InterfazTerminal:
         print("💳 PROCESAR PAGO".center(70))
         print("=" * 70)
         
-        print(f"\nTotal a pagar: {MONEDA}{resumen['total']:.2f}")
+        print(f"\nTotal a pagar: {MONEDA}{resumen['total']:.0f}")
         print("\nMétodos de pago:")
         opciones_pago = [("efectivo", "Efectivo"), ("tarjeta", "Tarjeta"), ("transferencia", "Transferencia")]
         idx = self.seleccionar_opcion(opciones_pago, prompt="Selecciona método de pago")
@@ -515,6 +515,26 @@ class InterfazTerminal:
             metodo = "efectivo"
         else:
             metodo = opciones_pago[idx][0]
+
+        vuelto = None
+        efectivo_recibido = None
+        if metodo == "efectivo":
+            total = round(resumen["total"])
+            while True:
+                try:
+                    efectivo_recibido = int(input("Efectivo recibido: "))
+                except ValueError:
+                    print("❌ Ingresa un monto válido en unidades enteras.")
+                    continue
+
+                try:
+                    vuelto = calcular_vuelto(total, efectivo_recibido)
+                    break
+                except ValueError:
+                    print(
+                        f"❌ Pago insuficiente. El total es {MONEDA}{total}; "
+                        f"faltan {MONEDA}{total - efectivo_recibido}."
+                    )
         
         usuario = input("Nombre del cajero: ").strip() or "Sistema"
         notas = input("Notas (opcional): ").strip()
@@ -534,8 +554,11 @@ class InterfazTerminal:
             print("✅ VENTA COMPLETADA".center(70))
             print("=" * 70)
             print(f"\nNúmero de ticket: {venta.numero_ticket}")
-            print(f"Total: {MONEDA}{venta.total:.2f}")
+            print(f"Total: {MONEDA}{venta.total:.0f}")
             print(f"Método de pago: {venta.metodo_pago}")
+            if metodo == "efectivo":
+                print(f"Efectivo recibido: {MONEDA}{efectivo_recibido:.0f}")
+                print(f"Vuelto: {MONEDA}{vuelto:.0f}")
             print(f"Fecha: {venta.fecha}")
             print("\n¡Gracias por su compra!")
             print("=" * 70)
@@ -555,7 +578,7 @@ class InterfazTerminal:
         print(f"\nFecha: {reporte['fecha']}")
         print(f"Total de productos: {reporte['total_productos']}")
         print(f"Stock total: {reporte['total_stock']} unidades")
-        print(f"Valor del inventario: {MONEDA}{reporte['valor_inventario']:.2f}")
+        print(f"Valor del inventario: {MONEDA}{reporte['valor_inventario']:.0f}")
         print(f"Productos sin stock: {reporte['productos_sin_stock']}")
         print(f"Productos en alerta: {reporte['productos_alerta']}")
         

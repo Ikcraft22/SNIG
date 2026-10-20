@@ -18,6 +18,18 @@ from database.models import (
 
 logger = logging.getLogger(__name__)
 
+
+def calcular_vuelto(total: int, efectivo_recibido: int) -> int:
+    """Calcula el vuelto y rechaza pagos en efectivo insuficientes."""
+    total = round(total)
+    efectivo_recibido = round(efectivo_recibido)
+    if total < 0:
+        raise ValueError("El total no puede ser negativo")
+    if efectivo_recibido < total:
+        raise ValueError("El efectivo recibido no cubre el total")
+    return efectivo_recibido - total
+
+
 class CarritoCompra:
     """Carrito de compras temporal"""
     
@@ -57,19 +69,23 @@ class CarritoCompra:
         if descuento < 0 or descuento > 100:
             logger.warning("⚠️ Descuento debe estar entre 0 y 100")
             return False
+
+        precio_unitario = round(precio_unitario)
         
         # Verificar si el producto ya está en el carrito
         for item in self.items:
             if item["presentacion_id"] == presentacion_id:
                 item["cantidad"] += cantidad
-                item["subtotal"] = item["cantidad"] * item["precio_unitario"] - item["descuento_cantidad"]
+                item["subtotal"] = round(
+                    item["cantidad"] * item["precio_unitario"] - item["descuento_cantidad"]
+                )
                 self._recalcular()
                 return True
         
         # Crear nuevo item
         subtotal_item = cantidad * precio_unitario
         descuento_cantidad = (subtotal_item * descuento) / 100
-        subtotal_final = subtotal_item - descuento_cantidad
+        subtotal_final = round(subtotal_item - descuento_cantidad)
         
         item = {
             "producto_id": producto_id,
@@ -89,6 +105,36 @@ class CarritoCompra:
         logger.info(f"✅ Item agregado al carrito: {cantidad}x ${precio_unitario}")
         return True
     
+    def modificar_cantidad_item(self, presentacion_id: int, nueva_cantidad: int) -> bool:
+        """Modifica la cantidad de un ítem existente en el carrito."""
+        if nueva_cantidad <= 0:
+            logger.warning("⚠️ La nueva cantidad debe ser mayor que 0")
+            return False
+        for item in self.items:
+            if item["presentacion_id"] == presentacion_id:
+                item["cantidad"] = nueva_cantidad
+                subtotal_item = nueva_cantidad * item["precio_unitario"]
+                item["descuento_cantidad"] = (subtotal_item * item["descuento_porcentaje"]) / 100
+                item["subtotal"] = round(subtotal_item - item["descuento_cantidad"])
+                self._recalcular()
+                return True
+        return False
+
+    def aplicar_descuento_item(self, presentacion_id: int, descuento_porcentaje: float) -> bool:
+        """Modifica el porcentaje de descuento de un ítem en el carrito."""
+        if descuento_porcentaje < 0 or descuento_porcentaje > 100:
+            logger.warning("⚠️ Descuento debe estar entre 0 y 100")
+            return False
+        for item in self.items:
+            if item["presentacion_id"] == presentacion_id:
+                item["descuento_porcentaje"] = descuento_porcentaje
+                subtotal_item = item["cantidad"] * item["precio_unitario"]
+                item["descuento_cantidad"] = (subtotal_item * descuento_porcentaje) / 100
+                item["subtotal"] = round(subtotal_item - item["descuento_cantidad"])
+                self._recalcular()
+                return True
+        return False
+
     def eliminar_item(self, presentacion_id: int) -> bool:
         """Elimina un item del carrito"""
         for i, item in enumerate(self.items):
@@ -114,8 +160,8 @@ class CarritoCompra:
         return {
             "cantidad_items": len(self.items),
             "cantidad_productos": sum(item["cantidad"] for item in self.items),
-            "subtotal": round(self.subtotal, 2),
-            "total": round(self.total, 2)
+            "subtotal": round(self.subtotal),
+            "total": round(self.total)
         }
     
     def obtener_items(self) -> List[Dict[str, Any]]:
@@ -187,6 +233,7 @@ class GestorPOS:
                 metodo_pago=metodo_pago,
                 usuario=usuario,
                 notas=notas,
+                fecha=datetime.now(),
                 estado=EstadoVenta.COMPLETADA
             )
             
@@ -310,7 +357,72 @@ class GestorPOS:
         return {
             "fecha": fecha,
             "cantidad_ventas": cantidad_ventas,
-            "total_ventas": round(total_ventas, 2),
-            "promedio_venta": round(total_ventas / cantidad_ventas, 2) if cantidad_ventas > 0 else 0,
-            "metodos_pago": {k: round(v, 2) for k, v in metodos_pago.items()}
+            "total_ventas": round(total_ventas),
+            "promedio_venta": round(total_ventas / cantidad_ventas) if cantidad_ventas > 0 else 0,
+            "metodos_pago": {k: round(v) for k, v in metodos_pago.items()}
         }
+
+    def obtener_metricas_cierre_caja(self, fecha: str) -> Dict[str, Any]:
+        """
+        Obtiene las métricas consolidadas para arqueo y cierre de caja en una fecha (YYYY-MM-DD).
+        """
+        fecha_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
+        ventas = self.db.query(Venta).filter(
+            Venta.fecha >= datetime.combine(fecha_obj, datetime.min.time()),
+            Venta.fecha <= datetime.combine(fecha_obj, datetime.max.time())
+        ).all()
+
+        total_ingresos = sum(v.total for v in ventas)
+        cantidad_ventas = len(ventas)
+        ticket_promedio = round(total_ingresos / cantidad_ventas) if cantidad_ventas > 0 else 0
+
+        metodos_pago = {"efectivo": 0, "tarjeta": 0, "transferencia": 0}
+        for v in ventas:
+            mp = (v.metodo_pago or "otro").lower()
+            metodos_pago[mp] = metodos_pago.get(mp, 0) + round(v.total)
+
+        return {
+            "fecha": fecha,
+            "total_ingresos": round(total_ingresos),
+            "cantidad_ventas": cantidad_ventas,
+            "ticket_promedio": ticket_promedio,
+            "metodos_pago": metodos_pago
+        }
+
+    def obtener_ventas_rango(self, fecha_inicio: str, fecha_fin: str) -> List[Dict[str, Any]]:
+        """
+        Obtiene todas las ventas registradas entre dos fechas inclusive (YYYY-MM-DD).
+        """
+        fi = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+        ff = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+        ventas = self.db.query(Venta).filter(
+            Venta.fecha >= datetime.combine(fi, datetime.min.time()),
+            Venta.fecha <= datetime.combine(ff, datetime.max.time())
+        ).order_by(Venta.fecha.desc()).all()
+
+        return [
+            {
+                "id": v.id,
+                "numero_ticket": v.numero_ticket,
+                "total": v.total,
+                "metodo_pago": v.metodo_pago,
+                "usuario": v.usuario,
+                "fecha": v.fecha.isoformat(),
+                "items_count": len(v.items)
+            }
+            for v in ventas
+        ]
+
+    def obtener_resumen_por_cajero(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Genera un resumen consolidado de ventas acumuladas por cada cajero/usuario.
+        """
+        ventas = self.db.query(Venta).all()
+        resumen = {}
+        for v in ventas:
+            user = v.usuario or "Sistema"
+            if user not in resumen:
+                resumen[user] = {"total": 0, "cantidad": 0}
+            resumen[user]["total"] += round(v.total)
+            resumen[user]["cantidad"] += 1
+        return resumen

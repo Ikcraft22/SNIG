@@ -221,7 +221,7 @@
                         <td>${producto.laboratorio || 'N/A'}</td>
                         <td>${pres.tipo}</td>
                         <td>${pres.stock}</td>
-                        <td>$${pres.precio_venta.toFixed(2)}</td>
+                        <td>$${pres.precio_venta.toFixed(0)}</td>
                         <td>
                             <button class="btn btn-small" onclick="registrarEntrada(${pres.id})">Entrada</button>
                             <button class="btn btn-small" onclick="registrarSalida(${pres.id})">Salida</button>

@@ -92,6 +92,37 @@ class BarcodeLector:
         return digito_control == digito_calculado
     
     @staticmethod
+    def generar_gtin13_con_checksum(prefijo: str = "750") -> str:
+        """
+        Genera un código GTIN-13 válido a partir de un prefijo, calculando su dígito de control.
+
+        Args:
+            prefijo: Dígitos iniciales (1 a 12 dígitos). Si tiene menos de 12, se completa con ceros.
+
+        Returns:
+            Código GTIN-13 de 13 dígitos con dígito verificador matemáticamente válido.
+        """
+        prefijo_limpio = BarcodeLector.limpiar_codigo(str(prefijo))
+        if not prefijo_limpio:
+            prefijo_limpio = "750"
+
+        # Ajustar a exactamente 12 dígitos
+        if len(prefijo_limpio) > 12:
+            base_12 = prefijo_limpio[:12]
+        else:
+            base_12 = prefijo_limpio.ljust(12, "0")
+
+        # Calcular dígito de control estándar EAN-13
+        suma = 0
+        peso = 3
+        for digito in reversed(base_12):
+            suma += int(digito) * peso
+            peso = 1 if peso == 3 else 3
+
+        digito_control = (10 - (suma % 10)) % 10
+        return f"{base_12}{digito_control}"
+
+    @staticmethod
     def escanear_terminal() -> Optional[str]:
         """
         Lee un código de barras desde la terminal/teclado.

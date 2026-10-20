@@ -135,6 +135,171 @@ def crear_usuario_administrador():
         logger.error(f"❌ Error al crear usuario: {e}")
         return False
 
+def obtener_productos_demo_tienda_escolar():
+    """Retorna una lista de productos demo orientados a tienda escolar y minorista."""
+    return [
+        {
+            "gtin": "750100010001",
+            "nombre": "Paleta de fresa",
+            "categoria": "dulces",
+            "caracteristicas": "Caramelo macizo sabor fresa 20g",
+            "laboratorio": "Dulces Coronado",
+            "presentaciones": [
+                {"tipo": "unidad", "cantidad": 1, "precio_unitario": 5, "precio_venta": 10, "stock": 80}
+            ]
+        },
+        {
+            "gtin": "750100010002",
+            "nombre": "Chocolate con leche 30g",
+            "categoria": "dulces",
+            "caracteristicas": "Tableta de chocolate con leche",
+            "laboratorio": "Nestle",
+            "presentaciones": [
+                {"tipo": "unidad", "cantidad": 1, "precio_unitario": 12, "precio_venta": 22, "stock": 50}
+            ]
+        },
+        {
+            "gtin": "750100010003",
+            "nombre": "Gomitas frutales 50g",
+            "categoria": "dulces",
+            "caracteristicas": "Gomitas surtidas de frutas",
+            "laboratorio": "Ricolino",
+            "presentaciones": [
+                {"tipo": "bolsa", "cantidad": 1, "precio_unitario": 8, "precio_venta": 15, "stock": 60}
+            ]
+        },
+        {
+            "gtin": "750100010004",
+            "nombre": "Cuaderno Profesional 100 Hojas",
+            "categoria": "papeleria",
+            "caracteristicas": "Cuadrícula chica pasta dura",
+            "laboratorio": "Scribe",
+            "presentaciones": [
+                {"tipo": "unidad", "cantidad": 1, "precio_unitario": 20, "precio_venta": 45, "stock": 40}
+            ]
+        },
+        {
+            "gtin": "750100010005",
+            "nombre": "Lápiz Grafito 2B",
+            "categoria": "papeleria",
+            "caracteristicas": "Madera reforestada grafito HB",
+            "laboratorio": "Dixon",
+            "presentaciones": [
+                {"tipo": "unidad", "cantidad": 1, "precio_unitario": 4, "precio_venta": 10, "stock": 100}
+            ]
+        },
+        {
+            "gtin": "750100010006",
+            "nombre": "Bolígrafo Tinta Negra",
+            "categoria": "papeleria",
+            "caracteristicas": "Punto mediano 1.0mm",
+            "laboratorio": "BIC",
+            "presentaciones": [
+                {"tipo": "unidad", "cantidad": 1, "precio_unitario": 5, "precio_venta": 12, "stock": 120}
+            ]
+        },
+        {
+            "gtin": "750100010007",
+            "nombre": "Goma de borrar blanca",
+            "categoria": "papeleria",
+            "caracteristicas": "Libre de látex no mancha",
+            "laboratorio": "Pelikan",
+            "presentaciones": [
+                {"tipo": "unidad", "cantidad": 1, "precio_unitario": 6, "precio_venta": 15, "stock": 70}
+            ]
+        },
+        {
+            "gtin": "750100010008",
+            "nombre": "Regla flexible 30cm",
+            "categoria": "papeleria",
+            "caracteristicas": "Plástico flexible graduado",
+            "laboratorio": "Mae",
+            "presentaciones": [
+                {"tipo": "unidad", "cantidad": 1, "precio_unitario": 8, "precio_venta": 18, "stock": 35}
+            ]
+        },
+        {
+            "gtin": "750100010009",
+            "nombre": "Sacapuntas con depósito",
+            "categoria": "papeleria",
+            "caracteristicas": "Cuchilla de acero con depósito",
+            "laboratorio": "Maped",
+            "presentaciones": [
+                {"tipo": "unidad", "cantidad": 1, "precio_unitario": 7, "precio_venta": 16, "stock": 45}
+            ]
+        },
+        {
+            "gtin": "750100010010",
+            "nombre": "Pegamento adhesivo en barra 22g",
+            "categoria": "papeleria",
+            "caracteristicas": "Fórmula lavable no tóxica",
+            "laboratorio": "Pritt",
+            "presentaciones": [
+                {"tipo": "unidad", "cantidad": 1, "precio_unitario": 14, "precio_venta": 28, "stock": 50}
+            ]
+        },
+        {
+            "gtin": "750100010011",
+            "nombre": "Tijeras escolares punta roma",
+            "categoria": "papeleria",
+            "caracteristicas": "Acero inoxidable seguras",
+            "laboratorio": "Barrilito",
+            "presentaciones": [
+                {"tipo": "unidad", "cantidad": 1, "precio_unitario": 12, "precio_venta": 25, "stock": 30}
+            ]
+        },
+        {
+            "gtin": "750100010012",
+            "nombre": "Agua purificada 500ml",
+            "categoria": "bebidas",
+            "caracteristicas": "Botella de agua purificada",
+            "laboratorio": "Ciel",
+            "presentaciones": [
+                {"tipo": "botella", "cantidad": 1, "precio_unitario": 6, "precio_venta": 12, "stock": 90}
+            ]
+        },
+        {
+            "gtin": "750100010013",
+            "nombre": "Jugo de manzana 200ml",
+            "categoria": "bebidas",
+            "caracteristicas": "Jugo natural sin azúcar añadida",
+            "laboratorio": "Del Valle",
+            "presentaciones": [
+                {"tipo": "unidad", "cantidad": 1, "precio_unitario": 9, "precio_venta": 18, "stock": 60}
+            ]
+        },
+        {
+            "gtin": "750100010014",
+            "nombre": "Papas fritas con sal 45g",
+            "categoria": "snacks",
+            "caracteristicas": "Papas crujientes saladas",
+            "laboratorio": "Sabritas",
+            "presentaciones": [
+                {"tipo": "bolsa", "cantidad": 1, "precio_unitario": 13, "precio_venta": 24, "stock": 40}
+            ]
+        },
+        {
+            "gtin": "750100010015",
+            "nombre": "Galletas con chispas de chocolate",
+            "categoria": "snacks",
+            "caracteristicas": "Paquete con 6 galletas",
+            "laboratorio": "Gamesa",
+            "presentaciones": [
+                {"tipo": "unidad", "cantidad": 1, "precio_unitario": 10, "precio_venta": 20, "stock": 55}
+            ]
+        },
+        {
+            "gtin": "750100010016",
+            "nombre": "Barra de cereal con avena",
+            "categoria": "snacks",
+            "caracteristicas": "Avena y miel 38g",
+            "laboratorio": "Quaker",
+            "presentaciones": [
+                {"tipo": "unidad", "cantidad": 1, "precio_unitario": 8, "precio_venta": 16, "stock": 40}
+            ]
+        }
+    ]
+
 def cargar_datos_iniciales():
     """Opcionalmente carga datos de prueba"""
     print("\n" + "=" * 70)
@@ -155,38 +320,14 @@ def cargar_datos_iniciales():
         gestor = GestorInventario(db)
         
         # Productos de prueba
-        productos_prueba = [
-            {
-                'gtin': '7501001234567',
-                'nombre': 'Paracetamol 500mg',
-                'laboratorio': 'Lab Genérico',
-                'presentaciones': [
-                    {'tipo': 'unidad', 'cantidad': 1, 'precio_unitario': 30, 'precio_venta': 50, 'stock': 50}
-                ]
-            },
-            {
-                'gtin': '7501001234568',
-                'nombre': 'Ibupirac 400mg',
-                'laboratorio': 'Lab Genérico',
-                'presentaciones': [
-                    {'tipo': 'bolsa', 'cantidad': 10, 'precio_unitario': 120, 'precio_venta': 260, 'stock': 30}
-                ]
-            },
-            {
-                'gtin': '7501001234569',
-                'nombre': 'Vitamina C 1000mg',
-                'laboratorio': 'Lab Salud',
-                'presentaciones': [
-                    {'tipo': 'botella', 'cantidad': 1, 'precio_unitario': 90, 'precio_venta': 190, 'stock': 100}
-                ]
-            }
-        ]
+        productos_prueba = obtener_productos_demo_tienda_escolar()
         
         for prod in productos_prueba:
             producto = gestor.registrar_producto(
                 gtin=prod['gtin'],
                 nombre=prod['nombre'],
-                laboratorio=prod['laboratorio']
+                laboratorio=prod.get('laboratorio'),
+                descripcion=prod.get('caracteristicas')
             )
             
             if producto:

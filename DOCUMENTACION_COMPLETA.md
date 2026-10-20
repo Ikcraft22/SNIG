@@ -1,7 +1,7 @@
 # Documentación completa del sistema
 
-Fecha de actualización: 4 de septiembre de 2026
-Versión: 1.1.0
+Fecha de actualización: 20 de octubre de 2026
+Versión: 1.2.0
 Estado: funcional
 
 ## 1. Introducción
@@ -215,16 +215,14 @@ pip install flask
 ## 13. Roadmap sugerido
 
 - autenticación de usuarios
-- exportación a PDF/Excel
-- reportes más detallados
+- exportación de reportes a PDF
 - validación de negocio y alertas avanzadas
-- pruebas automáticas
 - mejora de sincronización y escalabilidad
 
 ---
 
-Última actualización: 11 de agosto de 2026
-Versión actual: 1.0.3
+Última actualización: 20 de octubre de 2026
+Versión actual: 1.2.0
 # APIs (Opcional)
 GOOGLE_API_KEY=                    # Obtén desde Google Cloud Console
 GOOGLE_SEARCH_ENGINE_ID=           # Obtén de Custom Search Engine
@@ -1359,12 +1357,306 @@ Este sistema proporciona una **solución profesional, completa y escalable** par
 
 ---
 
+## Novedades versión 1.2.0 (octubre 2026)
+
+Esta versión incorpora mejoras exponenciales al núcleo del sistema: búsqueda avanzada multi-criterio, valorización financiera de inventario, sugerencias de reabastecimiento automático, importación/exportación de catálogo en CSV y Excel, sistema de backups con restauración, generación de GTIN-13 válido con checksum EAN, gestión avanzada del carrito POS con descuentos por ítem, cierre de caja por cajero, y nuevos endpoints REST.
+
+---
+
+### 12. Nuevas funciones de inventario (`core/inventory_manager.py`)
+
+#### 12.1 `buscar_productos(termino: str) -> list[Producto]`
+
+Búsqueda inteligente multi-criterio. Busca el término (insensible a mayúsculas) en los campos `nombre`, `gtin`, `laboratorio`, `descripcion` y `principio_activo` simultáneamente usando `OR` de SQL. Devuelve una lista de productos que coinciden con cualquiera de los criterios.
+
+```python
+from core.inventory_manager import InventarioManager
+inv = InventarioManager(session)
+resultados = inv.buscar_productos("vitamina")
+# → lista de Producto con nombre/gtin/laboratorio/descripcion/principio_activo que contengan "vitamina"
+```
+
+**Uso en GUI:** La barra de búsqueda del panel Inventario ahora usa esta función al presionar Enter, mostrando resultados multi-coincidencia en lugar de solo búsqueda exacta por GTIN.
+
+---
+
+#### 12.2 `calcular_valor_inventario() -> dict`
+
+Calcula la **valorización financiera** del inventario completo. Itera todas las presentaciones con stock > 0 y retorna:
+
+| Clave | Descripción |
+|-------|-------------|
+| `valor_costo_total` | Suma de `precio_costo × stock` para todas las presentaciones |
+| `valor_venta_potencial` | Suma de `precio_venta × stock` para todas las presentaciones |
+| `ganancia_proyectada` | `valor_venta_potencial - valor_costo_total` |
+| `margen_promedio_porcentaje` | Margen ponderado promedio en porcentaje |
+
+```python
+resumen = inv.calcular_valor_inventario()
+print(f"Valor de costo: ${resumen['valor_costo_total']:,.2f}")
+print(f"Ganancia proyectada: ${resumen['ganancia_proyectada']:,.2f}")
+print(f"Margen promedio: {resumen['margen_promedio_porcentaje']:.1f}%")
+```
+
+**Botón GUI:** "💰 Valor Inventario" en el panel de acciones.
+
+---
+
+#### 12.3 `obtener_sugerencias_reabastecimiento() -> list[dict]`
+
+Detecta automáticamente qué productos están al límite crítico de stock. Devuelve una lista de diccionarios para cada presentación cuyo `stock_actual ≤ stock_minimo`:
+
+```python
+[
+  {
+    "producto_id": 1,
+    "producto_nombre": "Cuaderno Profesional",
+    "presentacion_id": 2,
+    "presentacion_nombre": "Cuaderno 100 hojas",
+    "stock_actual": 3,
+    "stock_minimo": 5,
+    "stock_maximo": 50,
+    "cantidad_sugerida": 47   # = stock_maximo - stock_actual
+  },
+  ...
+]
+```
+
+---
+
+#### 12.4 `exportar_catalogo_csv(ruta_archivo: str) -> None`
+
+Exporta el catálogo completo de productos y sus presentaciones a un archivo CSV con los encabezados:
+
+`producto_id, producto_nombre, gtin, laboratorio, presentacion_id, presentacion_nombre, precio_costo, precio_venta, stock_actual, stock_minimo, stock_maximo`
+
+```python
+inv.exportar_catalogo_csv("catalogo_octubre_2026.csv")
+```
+
+**Botón GUI:** "📥 Exportar Catálogo" en el panel de acciones abre un diálogo de guardado y llama a esta función.
+
+---
+
+#### 12.5 `exportar_catalogo_excel(ruta_archivo: str) -> None`
+
+Exporta el mismo catálogo a formato `.xlsx` usando `pandas`. Requiere que `pandas` y `openpyxl` estén instalados.
+
+```python
+inv.exportar_catalogo_excel("catalogo.xlsx")
+```
+
+---
+
+#### 12.6 `importar_catalogo_csv(ruta_archivo: str) -> dict`
+
+Importa productos y presentaciones desde un CSV con el mismo formato que exporta `exportar_catalogo_csv`. Procesa fila a fila con validación, actualizando o creando registros. Retorna:
+
+```python
+{
+  "exitosos": 14,
+  "errores": 1,
+  "detalles_errores": ["Fila 5: precio_venta inválido"]
+}
+```
+
+---
+
+#### 12.7 Gestión de Backups
+
+| Función | Descripción |
+|---------|-------------|
+| `crear_backup(sqlite_file_path, backup_dir)` | Crea una copia `.db` con timestamp (`inventario_backup_YYYYMMDD_HHMMSS.db`) |
+| `listar_backups(backup_dir)` | Devuelve lista de backups ordenados del más reciente al más antiguo |
+| `restaurar_backup(archivo_backup, sqlite_file_path)` | Reemplaza la base activa con el backup seleccionado |
+
+```python
+# Crear backup
+inv.crear_backup("inventario.db", "backups/")
+
+# Listar disponibles
+backups = inv.listar_backups("backups/")
+# [{"nombre": "inventario_backup_20261018_130500.db", "fecha": "2026-10-18 13:05:00", "tamaño_kb": 124}]
+
+# Restaurar
+inv.restaurar_backup("backups/inventario_backup_20261018_130500.db", "inventario.db")
+```
+
+---
+
+### 13. Nuevas funciones POS (`core/pos_manager.py`)
+
+#### 13.1 `CarritoCompra.modificar_cantidad_item(presentacion_id, nueva_cantidad)`
+
+Permite cambiar la cantidad de un producto ya agregado al carrito. Si `nueva_cantidad ≤ 0`, el ítem se elimina del carrito.
+
+```python
+carrito = CarritoCompra(session)
+carrito.agregar_item(presentacion_id=3, cantidad=2)
+carrito.modificar_cantidad_item(presentacion_id=3, nueva_cantidad=5)
+```
+
+---
+
+#### 13.2 `CarritoCompra.aplicar_descuento_item(presentacion_id, descuento_porcentaje)`
+
+Aplica un descuento porcentual (0–100) a un ítem específico del carrito, ajustando su `precio_unitario` para el cálculo del total.
+
+```python
+carrito.aplicar_descuento_item(presentacion_id=3, descuento_porcentaje=10.0)
+# Si precio original era $100, ahora se calcula a $90
+```
+
+---
+
+#### 13.3 `obtener_metricas_cierre_caja(fecha: date) -> dict`
+
+Genera el **resumen de cierre de caja diario** para la fecha indicada:
+
+```python
+from datetime import date
+metricas = pos.obtener_metricas_cierre_caja(date.today())
+# {
+#   "total_ingresos": 1250.50,
+#   "cantidad_ventas": 8,
+#   "ticket_promedio": 156.31,
+#   "metodos_pago": {"Efectivo": 750.0, "Tarjeta": 500.50}
+# }
+```
+
+---
+
+#### 13.4 `obtener_ventas_rango(fecha_inicio, fecha_fin) -> list[Venta]`
+
+Recupera todas las ventas realizadas entre dos fechas (inclusive) ordenadas por fecha descendente.
+
+```python
+from datetime import date
+ventas = pos.obtener_ventas_rango(date(2026, 10, 1), date(2026, 10, 18))
+```
+
+---
+
+#### 13.5 `obtener_resumen_por_cajero() -> dict`
+
+Agrega las ventas totales por usuario/cajero. Útil para comisiones y control de rendimiento.
+
+```python
+resumen = pos.obtener_resumen_por_cajero()
+# {
+#   "cajero1": {"total": 3200.0, "cantidad_ventas": 21},
+#   "cajero2": {"total": 1800.0, "cantidad_ventas": 14}
+# }
+```
+
+---
+
+### 14. Generador de GTIN-13 (`core/barcode_scanner.py`)
+
+#### 14.1 `generar_gtin13_con_checksum(prefijo: str) -> str`
+
+Genera un código de barras GTIN-13 válido (EAN-13) a partir de un prefijo numérico. El prefijo se rellena o trunca a 12 dígitos, y el dígito de control se calcula automáticamente según el algoritmo estándar.
+
+```python
+from core.barcode_scanner import BarcodeScanner
+scanner = BarcodeScanner(session)
+gtin = scanner.generar_gtin13_con_checksum("77012345")
+# → "7701234500005"  (13 dígitos con checksum válido)
+```
+
+**Verificación:** El dígito 13 cumple el algoritmo de Luhn modificado para EAN-13: `(10 - (suma_ponderada % 10)) % 10`.
+
+---
+
+### 15. Nuevos endpoints REST (`web/app.py`)
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/api/inventario/resumen-financiero` | Retorna `calcular_valor_inventario()` en JSON |
+| `GET` | `/api/inventario/reabastecimiento` | Lista productos que necesitan reabastecimiento |
+| `GET` | `/api/inventario/exportar` | Descarga el catálogo completo como archivo CSV |
+| `POST` | `/api/inventario/importar` | Sube un CSV para importar al catálogo |
+| `GET` | `/api/inventario/backup` | Crea un backup de la base de datos |
+| `POST` | `/api/inventario/backup` | Restaura el último backup disponible |
+| `GET` | `/api/pos/cierre-caja` | Retorna métricas de cierre de caja (`?fecha=YYYY-MM-DD`) |
+
+**Ejemplos de uso:**
+
+```bash
+# Resumen financiero
+curl http://localhost:5000/api/inventario/resumen-financiero
+
+# Descargar catálogo CSV
+curl -o catalogo.csv http://localhost:5000/api/inventario/exportar
+
+# Subir catálogo CSV
+curl -X POST -F "file=@catalogo.csv" http://localhost:5000/api/inventario/importar
+
+# Cierre de caja del día
+curl "http://localhost:5000/api/pos/cierre-caja?fecha=2026-10-18"
+```
+
+---
+
+### 16. Nuevas funciones en la GUI PyQt5 (`ui/gui_ui.py`)
+
+#### 16.1 Búsqueda multi-criterio
+
+- El campo GTIN/búsqueda ahora tiene placeholder: `"Buscar por nombre, GTIN, laboratorio..."`
+- Al presionar **Enter** en ese campo se llama a `buscar_productos(termino)` mostrando todos los resultados que coincidan con nombre, GTIN, laboratorio, descripción o principio activo.
+
+#### 16.2 Botón "📥 Exportar Catálogo"
+
+Abre un diálogo de guardado de archivo (`QFileDialog`), solicita la ruta y nombre del CSV, y llama a `exportar_catalogo_csv()`. Muestra confirmación de éxito o error.
+
+#### 16.3 Botón "💰 Valor Inventario"
+
+Llama a `calcular_valor_inventario()` y muestra un `QMessageBox` con el resumen financiero formateado:
+
+```
+💰 Valor del Inventario
+────────────────────────
+Costo total:      $45,320.00
+Venta potencial:  $72,150.00
+Ganancia potencial: $26,830.00
+Margen promedio:  37.2%
+```
+
+---
+
+### 17. Suite de pruebas (v1.2.0)
+
+El proyecto cuenta ahora con **28 pruebas automatizadas** distribuidas en 11 archivos:
+
+| Archivo | Pruebas | Descripción |
+|---------|---------|-------------|
+| `test_inventory_advanced.py` | 5 | Búsqueda, valorización, reabastecimiento, CSV, backup |
+| `test_pos_advanced.py` | 2 | Carrito con modificaciones y cierre de caja |
+| `test_barcode_generator.py` | 2 | Generación GTIN-13 con checksum EAN válido |
+| `test_web_api.py` | 5 | Endpoints REST: financiero, reabastecimiento, CSV, backup, cierre |
+| `test_inventory_product_edit.py` | 3 | Edición de productos en GUI |
+| `test_pos_cash_change.py` | 3 | Cálculo de vuelto en POS |
+| `test_gui_theme.py` | 3 | Persistencia del tema GUI |
+| `test_switch_dia_noche.py` | 2 | Interruptor día/noche |
+| `test_seed_products.py` | 1 | Carga de datos demo tienda escolar |
+| `test_streamlit_reports.py` | 1 | Preparación datos dashboard |
+| `test_barcode_scanner.py` | 1 | Scanner GTIN básico |
+
+Ejecutar todos los tests:
+
+```bash
+python -m pytest
+# 28 passed, 5 warnings
+```
+
+---
+
 ## Agradecimientos
 
 - [opensource-coding/Dark-Light-Mode-Switch](https://github.com/opensource-coding/Dark-Light-Mode-Switch) — componente de interruptor de modo oscuro/claro integrado en la interfaz web del proyecto.
 
-**Última actualización**: 31 de mayo de 2026  
-**Versión**: 1.0.0  
+**Última actualización**: 20 de octubre de 2026
+**Versión**: 1.2.0
 **Estado**: Producción  
 **Autor**: GitHub Copilot
 

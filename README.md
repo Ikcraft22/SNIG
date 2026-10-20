@@ -1,6 +1,6 @@
 # Sistema de Inventario
 
-Documentación actualizada el 4 de septiembre de 2026.
+Documentación actualizada el 20 de octubre de 2026.
 
 ## Resumen del proyecto
 
@@ -11,16 +11,24 @@ Actualmente incluye:
 - gestión de productos y presentaciones
 - control de stock por entradas, salidas y ajustes
 - punto de venta con escaneo rápido por GTIN
-- carrito de compra y cálculo automático de totales
+- carrito de compra con modificación de cantidad y descuentos por ítem
 - reportes interactivos avanzados con Streamlit y Plotly (gráficos de barras, líneas, áreas, dona/pastel, treemaps, dispersión y exportación a Excel/CSV)
 - interfaz gráfica con PyQt5 y acceso en un clic a los reportes
 - flujo de pago simplificado con selección numérica
 - modo oscuro / claro con memoria y persistencia automática entre sesiones
+- **búsqueda avanzada multi-criterio** (nombre, GTIN, laboratorio, descripción)
+- **valorización financiera del inventario** (costo total, venta potencial, margen)
+- **sugerencias automáticas de reabastecimiento** por stock mínimo
+- **importación de catálogo desde CSV y exportación** en CSV/Excel
+- **sistema de backups** de la base de datos con restauración
+- **generador de códigos GTIN-13** con checksum EAN válido
+- **cierre de caja diario** con resumen por cajero y método de pago
+- **API REST ampliada** con nuevas rutas para inventario y caja
 
 ## Estado actual
 
-Versión actual: 1.1.0
-Estado: funcional y listo para uso local con GUI y Dashboard Streamlit
+Versión actual: 1.2.0
+Estado: funcional y listo para uso local con GUI, Dashboard Streamlit y API REST
 
 ## Características principales de la GUI
 
@@ -182,10 +190,8 @@ pip install flask
 ## Roadmap
 
 - autenticación de usuarios
-- exportación a Excel/PDF
-- reportes más avanzados
+- exportación de reportes a PDF
 - validaciones adicionales de negocio
-- pruebas automáticas
 - mejoras de sincronización y escalabilidad
 
 ## Agradecimientos
@@ -194,5 +200,5 @@ pip install flask
 
 ---
 
-Última actualización: 11 de agosto de 2026
-Versión: 1.0.3
+Última actualización: 20 de octubre de 2026
+Versión: 1.2.0

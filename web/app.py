@@ -7,10 +7,12 @@ Proporciona:
 - Panel de administración
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, Response
 from flask_cors import CORS
-from datetime import datetime
+from datetime import datetime, date
 import logging
+import os
+import tempfile
 
 from database.connection import SessionLocal, init_db
 from database.models import Producto, Presentacion, Venta
@@ -294,6 +296,126 @@ def reporte_ventas(fecha):
     
     except Exception as e:
         logger.error(f"Error al generar reporte de ventas: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+# ============== API - FUNCIONES AVANZADAS DE INVENTARIO & POS ==============
+
+@app.route('/api/inventario/resumen-financiero', methods=['GET'])
+def api_inventario_resumen_financiero():
+    """Obtiene el resumen financiero de valorización y rentabilidad del inventario"""
+    try:
+        db = obtener_db()
+        gestor = GestorInventario(db)
+        resumen = gestor.calcular_valor_inventario()
+        return jsonify(resumen), 200
+    except Exception as e:
+        logger.error(f"Error al obtener resumen financiero: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/inventario/reabastecimiento', methods=['GET'])
+def api_inventario_reabastecimiento():
+    """Obtiene la lista de sugerencias de reabastecimiento para productos en nivel crítico/bajo"""
+    try:
+        db = obtener_db()
+        gestor = GestorInventario(db)
+        sugerencias = gestor.obtener_sugerencias_reabastecimiento()
+        return jsonify(sugerencias), 200
+    except Exception as e:
+        logger.error(f"Error al obtener sugerencias de reabastecimiento: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/inventario/exportar', methods=['GET'])
+def api_inventario_exportar():
+    """Exporta y descarga el catálogo completo en formato CSV"""
+    db = obtener_db()
+    try:
+        gestor = GestorInventario(db)
+        with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.csv', encoding='utf-8') as temp_file:
+            temp_path = temp_file.name
+
+        exito = gestor.exportar_catalogo_csv(temp_path)
+        if not exito or not os.path.exists(temp_path):
+            return jsonify({'error': 'No se pudo generar el archivo de exportación'}), 500
+
+        with open(temp_path, 'r', encoding='utf-8') as f:
+            contenido = f.read()
+
+        os.remove(temp_path)
+        return Response(
+            contenido,
+            mimetype='text/csv',
+            headers={'Content-Disposition': 'attachment; filename=catalogo_inventario.csv'}
+        )
+    except Exception as e:
+        logger.error(f"Error al exportar catálogo: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/inventario/importar', methods=['POST'])
+def api_inventario_importar():
+    """Importa productos y presentaciones desde un archivo CSV cargado"""
+    db = obtener_db()
+    try:
+        if 'archivo' not in request.files:
+            return jsonify({'error': 'No se envió ningún archivo con el campo "archivo"'}), 400
+
+        archivo = request.files['archivo']
+        if not archivo.filename.endswith('.csv'):
+            return jsonify({'error': 'El archivo debe tener extensión .csv'}), 400
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as temp_file:
+            archivo.save(temp_file.name)
+            temp_path = temp_file.name
+
+        gestor = GestorInventario(db)
+        resultado = gestor.importar_catalogo_csv(temp_path)
+        os.remove(temp_path)
+
+        return jsonify(resultado), 200
+    except Exception as e:
+        logger.error(f"Error al importar catálogo: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/inventario/backup', methods=['GET', 'POST'])
+def api_inventario_backup():
+    """Genera una copia de seguridad timestamped de la base de datos"""
+    db = obtener_db()
+    try:
+        gestor = GestorInventario(db)
+        archivo_backup = gestor.crear_backup()
+        if archivo_backup:
+            return jsonify({
+                'mensaje': 'Copia de seguridad creada exitosamente',
+                'archivo': os.path.basename(archivo_backup),
+                'ruta': archivo_backup
+            }), 200
+        return jsonify({'error': 'No se pudo generar la copia de seguridad'}), 500
+    except Exception as e:
+        logger.error(f"Error al generar backup: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+@app.route('/api/pos/cierre-caja', methods=['GET'])
+def api_pos_cierre_caja():
+    """Obtiene el cuadre y cierre de caja del día o de la fecha especificada"""
+    fecha = request.args.get('fecha', date.today().isoformat())
+    db = obtener_db()
+    try:
+        pos = GestorPOS(db)
+        cierre = pos.obtener_metricas_cierre_caja(fecha)
+        return jsonify(cierre), 200
+    except Exception as e:
+        logger.error(f"Error al generar cierre de caja: {e}")
         return jsonify({'error': str(e)}), 500
     finally:
         db.close()

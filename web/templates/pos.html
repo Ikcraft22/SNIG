@@ -211,11 +211,11 @@
             <div class="resumen">
                 <div class="resumen-fila">
                     <span>Subtotal:</span>
-                    <span id="subtotal">$0.00</span>
+                    <span id="subtotal">$0</span>
                 </div>
                 <div class="resumen-total">
                     <span>Total:</span>
-                    <span id="total">$0.00</span>
+                    <span id="total">$0</span>
                 </div>
             </div>
             
@@ -239,7 +239,7 @@
                         const pres = producto.presentaciones[0];
                         document.getElementById('producto-nombre').textContent = producto.nombre;
                         document.getElementById('producto-presentacion').textContent = pres.tipo;
-                        document.getElementById('producto-precio').textContent = `$${pres.precio_venta.toFixed(2)}`;
+                        document.getElementById('producto-precio').textContent = `$${pres.precio_venta.toFixed(0)}`;
                         document.getElementById('producto-stock').textContent = pres.stock;
                         document.getElementById('producto-info').style.display = 'block';
                     }
@@ -261,13 +261,13 @@
                 .then(producto => {
                     if (producto.presentaciones && producto.presentaciones.length > 0) {
                         const pres = producto.presentaciones[0];
-                        
+                        const precio = Math.round(pres.precio_venta);
                         carrito.push({
                             producto: producto.nombre,
                             presentacion: pres.tipo,
                             cantidad: cantidad,
-                            precio: pres.precio_venta,
-                            subtotal: cantidad * pres.precio_venta
+                            precio: precio,
+                            subtotal: cantidad * precio
                         });
                         
                         actualizarCarrito();
@@ -291,8 +291,8 @@
                     <tr>
                         <td>${item.producto}</td>
                         <td>${item.cantidad}</td>
-                        <td>$${item.precio.toFixed(2)}</td>
-                        <td>$${item.subtotal.toFixed(2)}</td>
+                        <td>$${item.precio.toFixed(0)}</td>
+                        <td>$${item.subtotal.toFixed(0)}</td>
                         <td><button class="btn btn-danger" onclick="eliminarDelCarrito(${index})">🗑️</button></td>
                     </tr>
                 `;
@@ -303,8 +303,8 @@
             
             document.getElementById('carrito-table').style.display = carrito.length > 0 ? 'table' : 'none';
             document.getElementById('carrito-vacio').style.display = carrito.length > 0 ? 'none' : 'block';
-            document.getElementById('subtotal').textContent = `$${subtotal.toFixed(2)}`;
-            document.getElementById('total').textContent = `$${total.toFixed(2)}`;
+            document.getElementById('subtotal').textContent = `$${subtotal.toFixed(0)}`;
+            document.getElementById('total').textContent = `$${total.toFixed(0)}`;
             document.getElementById('btn-vaciar').disabled = carrito.length === 0;
             document.getElementById('btn-pagar').disabled = carrito.length === 0;
         }

@@ -1,5 +1,23 @@
 # CHANGELOG - Historial de Cambios
 
+## [1.2.0] - 20 de octubre de 2026
+
+### Agregado
+- ✅ Búsqueda de productos multi-criterio por nombre, GTIN, laboratorio, descripción y principio activo.
+- ✅ Valorización del inventario y sugerencias de reabastecimiento según stock mínimo y máximo.
+- ✅ Importación y exportación del catálogo en CSV y exportación a Excel.
+- ✅ Creación, listado y restauración de backups de la base de datos.
+- ✅ Generación de códigos GTIN-13 con dígito de control válido.
+- ✅ Gestión avanzada del carrito POS: modificación de cantidades y descuentos por ítem.
+- ✅ Métricas de cierre de caja, ventas por rango de fechas y resumen por cajero.
+- ✅ Endpoints REST para el resumen financiero, reabastecimiento, importación/exportación, backups y cierre de caja.
+- ✅ Nuevas acciones de inventario en la GUI y nuevas funciones cubiertas por pruebas automatizadas.
+
+### Mejorado
+- ✅ La documentación del proyecto refleja las funciones disponibles y el estado de las pruebas automatizadas.
+
+---
+
 ## [1.1.0] - 4 de septiembre de 2026
 
 ### Agregado

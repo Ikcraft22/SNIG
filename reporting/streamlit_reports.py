@@ -35,6 +35,50 @@ from config.settings import MONEDA
 
 
 # ==============================================================================
+# FUNCIONES DE PREPARACIÓN DE DATOS
+# ==============================================================================
+
+def preparar_datos_dashboard(productos: List[Dict[str, Any]], ventas: List[Dict[str, Any]]) -> Dict[str, pd.DataFrame]:
+    """
+    Procesa y estructura los datos tabulares de productos y ventas para el dashboard.
+
+    Args:
+        productos: Lista de productos con 'nombre' y 'stock_total' (o 'stock').
+        ventas: Lista de ventas con 'metodo_pago' y 'total'.
+
+    Returns:
+        Diccionario con DataFrames:
+        - 'stock': columnas ['Producto', 'Stock'] ordenado descendentemente por Stock.
+        - 'ventas': columnas ['MetodoPago', 'Total'] agrupado por MetodoPago y ordenado por Total descendente.
+    """
+    if productos:
+        filas_stock = [
+            {"Producto": p.get("nombre", "Sin nombre"), "Stock": p.get("stock_total", p.get("stock", 0))}
+            for p in productos
+        ]
+        df_stock = pd.DataFrame(filas_stock)
+        df_stock = df_stock.sort_values(by="Stock", ascending=False).reset_index(drop=True)
+    else:
+        df_stock = pd.DataFrame(columns=["Producto", "Stock"])
+
+    if ventas:
+        filas_ventas = [
+            {"MetodoPago": v.get("metodo_pago", "desconocido"), "Total": float(v.get("total", 0.0))}
+            for v in ventas
+        ]
+        df_ventas = pd.DataFrame(filas_ventas)
+        df_ventas = df_ventas.groupby("MetodoPago", as_index=False)["Total"].sum()
+        df_ventas = df_ventas.sort_values(by="Total", ascending=False).reset_index(drop=True)
+    else:
+        df_ventas = pd.DataFrame(columns=["MetodoPago", "Total"])
+
+    return {
+        "stock": df_stock,
+        "ventas": df_ventas
+    }
+
+
+# ==============================================================================
 # CONFIGURACIÓN DE PÁGINA Y ESTILOS
 # ==============================================================================
 
@@ -143,8 +187,8 @@ def cargar_datos_completos() -> Dict[str, pd.DataFrame]:
 
             for pres in p.presentaciones:
                 stock = int(pres.stock_actual or 0)
-                costo = float(pres.precio_unitario or 0.0)
-                venta = float(pres.precio_venta or 0.0)
+                costo = round(pres.precio_unitario or 0.0)
+                venta = round(pres.precio_venta or 0.0)
                 minimo = int(pres.stock_minimo or 0)
 
                 total_stock_p += stock
@@ -169,13 +213,13 @@ def cargar_datos_completos() -> Dict[str, pd.DataFrame]:
                     "CantidadPorEnvase": pres.cantidad,
                     "PrecioCosto": costo,
                     "PrecioVenta": venta,
-                    "MargenUnitario": venta - costo,
+                    "MargenUnitario": round(venta - costo),
                     "MargenPorcentaje": round(((venta - costo) / venta * 100), 2) if venta > 0 else 0.0,
                     "StockActual": stock,
                     "StockMinimo": minimo,
                     "EstadoStock": estado_stock,
-                    "ValorTotalCosto": round(stock * costo, 2),
-                    "ValorTotalVenta": round(stock * venta, 2),
+                    "ValorTotalCosto": round(stock * costo),
+                    "ValorTotalVenta": round(stock * venta),
                 })
 
             prod_rows.append({
@@ -185,8 +229,8 @@ def cargar_datos_completos() -> Dict[str, pd.DataFrame]:
                 "Laboratorio": p.laboratorio or "Sin especificar",
                 "PrincipioActivo": p.principio_activo or "N/A",
                 "TotalStock": total_stock_p,
-                "ValorInventarioCosto": round(valor_costo_p, 2),
-                "ValorInventarioVenta": round(valor_venta_p, 2),
+                "ValorInventarioCosto": round(valor_costo_p),
+                "ValorInventarioVenta": round(valor_venta_p),
                 "TotalPresentaciones": len(p.presentaciones),
                 "FechaCreacion": p.fecha_creacion,
             })
@@ -212,7 +256,7 @@ def cargar_datos_completos() -> Dict[str, pd.DataFrame]:
             fecha_v = v.fecha if v.fecha else datetime.now()
             metodo = str(v.metodo_pago or "Efectivo").capitalize()
             usuario = str(v.usuario or "Cajero").capitalize()
-            total_v = float(v.total or 0.0)
+            total_v = round(v.total or 0.0)
 
             ventas_rows.append({
                 "VentaID": v.id,
@@ -225,7 +269,7 @@ def cargar_datos_completos() -> Dict[str, pd.DataFrame]:
                 "MetodoPago": metodo,
                 "Usuario": usuario,
                 "Total": total_v,
-                "Subtotal": float(v.subtotal or total_v),
+                "Subtotal": round(v.subtotal or total_v),
                 "CantidadItems": len(v.items),
             })
 
@@ -235,8 +279,8 @@ def cargar_datos_completos() -> Dict[str, pd.DataFrame]:
                 pres_obj = getattr(item, "presentacion", None)
                 pres_tipo = pres_obj.tipo.value if (pres_obj and hasattr(pres_obj.tipo, "value")) else "unidad"
                 cant = int(item.cantidad or 0)
-                precio_u = float(item.precio_unitario or 0.0)
-                subt = float(item.subtotal or (cant * precio_u))
+                precio_u = round(item.precio_unitario or 0.0)
+                subt = round(item.subtotal or (cant * precio_u))
 
                 items_rows.append({
                     "ItemID": item.id,
@@ -452,7 +496,7 @@ def render_kpis_principales(datos: Dict[str, pd.DataFrame]):
 
     total_ingresos = df_ventas["Total"].sum() if not df_ventas.empty else 0.0
     cant_ventas = len(df_ventas) if not df_ventas.empty else 0
-    ticket_promedio = (total_ingresos / cant_ventas) if cant_ventas > 0 else 0.0
+    ticket_promedio = round(total_ingresos / cant_ventas) if cant_ventas > 0 else 0
 
     total_unidades_stock = df_presentaciones["StockActual"].sum() if not df_presentaciones.empty else 0
     valor_inventario_costo = df_presentaciones["ValorTotalCosto"].sum() if not df_presentaciones.empty else 0.0
@@ -467,7 +511,7 @@ def render_kpis_principales(datos: Dict[str, pd.DataFrame]):
             f"""
             <div class="metric-card">
                 <div class="metric-title">💰 Total Ventas</div>
-                <div class="metric-value">{MONEDA}{total_ingresos:,.2f}</div>
+                <div class="metric-value">{MONEDA}{total_ingresos:,.0f}</div>
                 <div class="metric-subtitle">🛒 {cant_ventas} transacciones</div>
             </div>
             """,
@@ -479,7 +523,7 @@ def render_kpis_principales(datos: Dict[str, pd.DataFrame]):
             f"""
             <div class="metric-card">
                 <div class="metric-title">🧾 Ticket Promedio</div>
-                <div class="metric-value">{MONEDA}{ticket_promedio:,.2f}</div>
+                <div class="metric-value">{MONEDA}{ticket_promedio:,.0f}</div>
                 <div class="metric-subtitle">por compra</div>
             </div>
             """,
@@ -503,8 +547,8 @@ def render_kpis_principales(datos: Dict[str, pd.DataFrame]):
             f"""
             <div class="metric-card">
                 <div class="metric-title">🏷️ Valor de Inventario</div>
-                <div class="metric-value">{MONEDA}{valor_inventario_venta:,.2f}</div>
-                <div class="metric-subtitle">Costo: {MONEDA}{valor_inventario_costo:,.2f}</div>
+                <div class="metric-value">{MONEDA}{valor_inventario_venta:,.0f}</div>
+                <div class="metric-subtitle">Costo: {MONEDA}{valor_inventario_costo:,.0f}</div>
             </div>
             """,
             unsafe_allow_html=True,

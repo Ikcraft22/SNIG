@@ -36,7 +36,7 @@ except ImportError:
 from database.connection import SessionLocal, init_db
 from core.barcode_scanner import EscanerProducto
 from core.inventory_manager import GestorInventario
-from core.pos_manager import GestorPOS
+from core.pos_manager import GestorPOS, calcular_vuelto
 from config.settings import PRESENTACIONES, MONEDA
 from ui.switch_dia_noche import SwitchDiaNoche
 
@@ -234,6 +234,8 @@ class VentanaPrincipal(QMainWindow):
         self.modo_oscuro = nuevo_modo_oscuro
         self._guardar_modo_oscuro(nuevo_modo_oscuro)
         self.crear_ui()
+        self.actualizar_tabla_carrito()
+        self.actualizar_resumen_carrito()
         self.configurar_logger_grafico()
     
     def crear_pestaña_inventario(self) -> QWidget:
@@ -288,8 +290,9 @@ class VentanaPrincipal(QMainWindow):
         layout_cabecera.addWidget(label_gtin)
 
         self.entrada_gtin = QLineEdit()
-        self.entrada_gtin.setPlaceholderText("Escanea o ingresa el GTIN")
+        self.entrada_gtin.setPlaceholderText("Buscar por nombre, GTIN, laboratorio...")
         self.entrada_gtin.setMinimumHeight(42)
+        self.entrada_gtin.returnPressed.connect(self.buscar_producto)
         layout_cabecera.addWidget(self.entrada_gtin, 1)
 
         _btn_style = "padding: 10px 16px; font-size: 15px; min-height: 46px; border-radius: 8px;"
@@ -379,6 +382,20 @@ class VentanaPrincipal(QMainWindow):
         btn_salida.setStyleSheet(_panel_btn_base + f"background-color: {superficie}; border: 1px solid {borde}; color: {texto};")
         btn_salida.clicked.connect(self.registrar_salida)
         layout_panel_acciones.addWidget(btn_salida)
+
+        btn_exportar = QPushButton("📥 Exportar Catálogo")
+        btn_exportar.setMinimumWidth(180)
+        btn_exportar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        btn_exportar.setStyleSheet(_panel_btn_base + f"background-color: {superficie}; border: 1px solid {borde}; color: {texto};")
+        btn_exportar.clicked.connect(self.exportar_catalogo_gui)
+        layout_panel_acciones.addWidget(btn_exportar)
+
+        btn_resumen_fin = QPushButton("💰 Valor Inventario")
+        btn_resumen_fin.setMinimumWidth(180)
+        btn_resumen_fin.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        btn_resumen_fin.setStyleSheet(_panel_btn_base + f"background-color: {superficie}; border: 1px solid {borde}; color: {texto};")
+        btn_resumen_fin.clicked.connect(self.mostrar_resumen_financiero_gui)
+        layout_panel_acciones.addWidget(btn_resumen_fin)
 
         layout_panel_acciones.addStretch(1)
         contenido.addWidget(panel_acciones, 1)
@@ -480,8 +497,8 @@ class VentanaPrincipal(QMainWindow):
         layout_derecha.addWidget(self.tabla_carrito)
 
         layout_resumen = QVBoxLayout()
-        self.label_subtotal = QLabel(f"Subtotal: {MONEDA}0.00")
-        self.label_total = QLabel(f"Total: {MONEDA}0.00")
+        self.label_subtotal = QLabel(f"Subtotal: {MONEDA}0")
+        self.label_total = QLabel(f"Total: {MONEDA}0")
         self.label_subtotal.setStyleSheet(f"font-size: 13px; color: {texto};")
         self.label_total.setStyleSheet("font-size: 14px; font-weight: bold; color: #27ae60;")
         layout_resumen.addWidget(self.label_subtotal)
@@ -659,26 +676,58 @@ class VentanaPrincipal(QMainWindow):
         root_logger.setLevel(logging.INFO)
 
     def buscar_producto(self):
-        """Busca un producto"""
-        gtin = self.entrada_gtin.text().strip()
-        if not gtin:
-            QMessageBox.warning(self, "Advertencia", "Ingresa un GTIN")
+        """Busca productos por nombre, GTIN, laboratorio o descripción"""
+        termino = self.entrada_gtin.text().strip()
+        if not termino:
+            QMessageBox.warning(self, "Advertencia", "Ingresa un GTIN o término de búsqueda")
             return
         
-        producto = self.inventario.obtener_producto_por_gtin(gtin)
+        productos = self.inventario.buscar_productos(termino)
         
-        if producto:
+        if productos:
             self.tabla_inventario.setRowCount(0)
-            for presentacion in producto.presentaciones:
-                fila = self.tabla_inventario.rowCount()
-                self.tabla_inventario.insertRow(fila)
-                
-                self.tabla_inventario.setItem(fila, 0, QTableWidgetItem(producto.gtin))
-                self.tabla_inventario.setItem(fila, 1, QTableWidgetItem(producto.nombre))
-                self.tabla_inventario.setItem(fila, 2, QTableWidgetItem(str(presentacion.stock_actual)))
-                self.tabla_inventario.setItem(fila, 3, QTableWidgetItem(f"{MONEDA}{presentacion.precio_venta:.2f}"))
+            for producto in productos:
+                for presentacion in producto.presentaciones:
+                    fila = self.tabla_inventario.rowCount()
+                    self.tabla_inventario.insertRow(fila)
+
+                    item_gtin = QTableWidgetItem(producto.gtin)
+                    item_gtin.setData(Qt.UserRole, presentacion.id)
+                    self.tabla_inventario.setItem(fila, 0, item_gtin)
+                    self.tabla_inventario.setItem(fila, 1, QTableWidgetItem(producto.nombre))
+                    self.tabla_inventario.setItem(fila, 2, QTableWidgetItem(str(presentacion.stock_actual)))
+                    self.tabla_inventario.setItem(fila, 3, QTableWidgetItem(f"{MONEDA}{presentacion.precio_venta:.0f}"))
         else:
-            QMessageBox.information(self, "Información", f"Producto no encontrado: {gtin}")
+            QMessageBox.information(self, "Información", f"No se encontraron productos para: {termino}")
+
+    def exportar_catalogo_gui(self):
+        """Exporta el catálogo actual a un archivo CSV seleccionado por el usuario"""
+        from PyQt5.QtWidgets import QFileDialog
+        ruta, _ = QFileDialog.getSaveFileName(
+            self,
+            "Exportar Catálogo de Inventario",
+            "catalogo_inventario.csv",
+            "Archivos CSV (*.csv)"
+        )
+        if ruta:
+            if self.inventario.exportar_catalogo_csv(ruta):
+                QMessageBox.information(self, "Éxito", f"Catálogo exportado exitosamente a:\n{ruta}")
+            else:
+                QMessageBox.critical(self, "Error", "No se pudo exportar el catálogo.")
+
+    def mostrar_resumen_financiero_gui(self):
+        """Muestra una ventana modal con el resumen de valorización y rentabilidad del inventario"""
+        datos = self.inventario.calcular_valor_inventario()
+        msg = (
+            f"💰 RESUMEN FINANCIERO DEL INVENTARIO\n\n"
+            f"• Inversión Total (Costo): {MONEDA}{datos['valor_costo_total']:,}\n"
+            f"• Venta Potencial Total: {MONEDA}{datos['valor_venta_potencial']:,}\n"
+            f"• Ganancia Proyectada: {MONEDA}{datos['ganancia_proyectada']:,}\n"
+            f"• Margen Promedio: {datos['margen_promedio_porcentaje']}%\n"
+            f"• Total Unidades en Stock: {datos['total_unidades']:,}\n"
+            f"• Presentaciones Registradas: {datos['total_presentaciones']}"
+        )
+        QMessageBox.information(self, "Valorización del Inventario", msg)
 
     def ver_todos_productos(self):
         """Carga todos los productos en la tabla de inventario"""
@@ -693,10 +742,12 @@ class VentanaPrincipal(QMainWindow):
             for presentacion in producto.presentaciones:
                 fila = self.tabla_inventario.rowCount()
                 self.tabla_inventario.insertRow(fila)
-                self.tabla_inventario.setItem(fila, 0, QTableWidgetItem(producto.gtin))
+                item_gtin = QTableWidgetItem(producto.gtin)
+                item_gtin.setData(Qt.UserRole, presentacion.id)
+                self.tabla_inventario.setItem(fila, 0, item_gtin)
                 self.tabla_inventario.setItem(fila, 1, QTableWidgetItem(producto.nombre))
                 self.tabla_inventario.setItem(fila, 2, QTableWidgetItem(str(presentacion.stock_actual)))
-                self.tabla_inventario.setItem(fila, 3, QTableWidgetItem(f"{MONEDA}{presentacion.precio_venta:.2f}"))
+                self.tabla_inventario.setItem(fila, 3, QTableWidgetItem(f"{MONEDA}{presentacion.precio_venta:.0f}"))
 
     def obtener_producto_y_presentacion_desde_fila(self, fila=None):
         """Obtiene el producto y la presentación asociados a una fila de la tabla."""
@@ -715,7 +766,13 @@ class VentanaPrincipal(QMainWindow):
         if not producto:
             return None, None
 
-        presentacion = producto.presentaciones[0] if producto.presentaciones else None
+        presentacion_id = item_gtin.data(Qt.UserRole)
+        presentacion = next(
+            (p for p in producto.presentaciones if p.id == presentacion_id),
+            None,
+        )
+        if presentacion is None and presentacion_id is None and producto.presentaciones:
+            presentacion = producto.presentaciones[0]
         return producto, presentacion
 
     def mostrar_menu_contextual_inventario(self, posicion):
@@ -748,11 +805,44 @@ class VentanaPrincipal(QMainWindow):
         accion_salida.triggered.connect(lambda: self.registrar_movimiento_contextual("salida", producto, presentacion))
         menu.addAction(accion_salida)
 
+        accion_editar = QAction("✏️ Editar producto", self.tabla_inventario)
+        accion_editar.triggered.connect(
+            lambda: self.editar_producto_contextual(producto, presentacion)
+        )
+        menu.addAction(accion_editar)
+
         accion_detalle = QAction("ℹ️ Ver detalles", self.tabla_inventario)
         accion_detalle.triggered.connect(lambda: self.mostrar_detalle_producto(producto, presentacion))
         menu.addAction(accion_detalle)
 
         menu.exec_(self.tabla_inventario.viewport().mapToGlobal(posicion))
+
+    def editar_producto_contextual(self, producto, presentacion):
+        """Edita los datos del producto y el precio de la presentación seleccionada."""
+        dialogo = DialogoEditarProducto(producto, presentacion, self)
+        if dialogo.exec_() != QDialog.Accepted:
+            return
+
+        datos = dialogo.obtener_datos()
+        actualizado = self.inventario.actualizar_producto(
+            producto_id=producto.id,
+            gtin=datos["gtin"],
+            nombre=datos["nombre"],
+            laboratorio=datos["laboratorio"],
+            descripcion=datos["descripcion"],
+            presentacion_id=presentacion.id,
+            precio_venta=datos["precio_venta"],
+        )
+        if not actualizado:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "No se pudo actualizar el producto. Verifica que el GTIN no esté en uso.",
+            )
+            return
+
+        QMessageBox.information(self, "Éxito", "Producto actualizado correctamente.")
+        self.ver_todos_productos()
 
     def registrar_movimiento_contextual(self, tipo, producto, presentacion):
         """Registra un movimiento de stock usando la selección del menú contextual."""
@@ -796,7 +886,7 @@ class VentanaPrincipal(QMainWindow):
             f"Nombre: {producto.nombre}\n"
             f"Presentación: {presentacion.tipo.value}\n"
             f"Stock actual: {presentacion.stock_actual}\n"
-            f"Precio de venta: {MONEDA}{presentacion.precio_venta:.2f}"
+            f"Precio de venta: {MONEDA}{presentacion.precio_venta:.0f}"
         )
         QMessageBox.information(self, "Detalle del producto", mensaje)
 
@@ -1061,6 +1151,26 @@ class VentanaPrincipal(QMainWindow):
             QMessageBox.warning(self, "Error", "Selecciona una opción válida: 1, 2 o 3")
             return
 
+        efectivo_recibido = None
+        vuelto = None
+        if metodo == "efectivo":
+            total = round(resumen["total"])
+            efectivo_recibido, ok = QInputDialog.getInt(
+                self,
+                "Pago en efectivo",
+                f"Total a pagar: {MONEDA}{total}\nEfectivo recibido:",
+                total,
+                total,
+                2_147_483_647,
+            )
+            if not ok:
+                return
+            try:
+                vuelto = calcular_vuelto(total, efectivo_recibido)
+            except ValueError as error:
+                QMessageBox.warning(self, "Pago insuficiente", str(error))
+                return
+
         usuario = "Sistema"
 
         numero_ticket = self.pos.generar_numero_ticket()
@@ -1072,7 +1182,16 @@ class VentanaPrincipal(QMainWindow):
         )
 
         if venta:
-            QMessageBox.information(self, "Venta completada", f"Ticket: {venta.numero_ticket}\nTotal: {MONEDA}{venta.total:.2f}")
+            mensaje = (
+                f"Ticket: {venta.numero_ticket}\n"
+                f"Total: {MONEDA}{venta.total:.0f}"
+            )
+            if metodo == "efectivo":
+                mensaje += (
+                    f"\nEfectivo recibido: {MONEDA}{efectivo_recibido:.0f}"
+                    f"\nVuelto: {MONEDA}{vuelto:.0f}"
+                )
+            QMessageBox.information(self, "Venta completada", mensaje)
             self.actualizar_tabla_carrito()
             self.actualizar_resumen_carrito()
             self.ver_todos_productos()
@@ -1082,8 +1201,8 @@ class VentanaPrincipal(QMainWindow):
     def actualizar_resumen_carrito(self):
         """Actualiza el resumen del carrito"""
         resumen = self.pos.carrito.obtener_resumen()
-        self.label_subtotal.setText(f"Subtotal: {MONEDA}{resumen['subtotal']:.2f}")
-        self.label_total.setText(f"Total: {MONEDA}{resumen['total']:.2f}")
+        self.label_subtotal.setText(f"Subtotal: {MONEDA}{resumen['subtotal']:.0f}")
+        self.label_total.setText(f"Total: {MONEDA}{resumen['total']:.0f}")
 
     def actualizar_tabla_carrito(self):
         """Actualiza la tabla de carrito con los items actuales"""
@@ -1099,9 +1218,9 @@ class VentanaPrincipal(QMainWindow):
             # Columna 1: Cantidad
             self.tabla_carrito.setItem(fila, 1, QTableWidgetItem(str(it['cantidad'])))
             # Columna 2: Precio
-            self.tabla_carrito.setItem(fila, 2, QTableWidgetItem(f"{MONEDA}{it['precio_unitario']:.2f}"))
+            self.tabla_carrito.setItem(fila, 2, QTableWidgetItem(f"{MONEDA}{it['precio_unitario']:.0f}"))
             # Columna 3: Subtotal
-            self.tabla_carrito.setItem(fila, 3, QTableWidgetItem(f"{MONEDA}{it['subtotal']:.2f}"))
+            self.tabla_carrito.setItem(fila, 3, QTableWidgetItem(f"{MONEDA}{it['subtotal']:.0f}"))
     
     def generar_reporte_inventario(self):
         """Genera reporte de inventario"""
@@ -1112,7 +1231,7 @@ class VentanaPrincipal(QMainWindow):
         
         Total de Productos: {reporte['total_productos']}
         Stock Total: {reporte['total_stock']} unidades
-        Valor Inventario: {MONEDA}{reporte['valor_inventario']:.2f}
+        Valor Inventario: {MONEDA}{reporte['valor_inventario']:.0f}
         Productos sin Stock: {reporte['productos_sin_stock']}
         Productos en Alerta: {reporte['productos_alerta']}
         """
@@ -1126,11 +1245,11 @@ class VentanaPrincipal(QMainWindow):
         Reporte de Ventas del {fecha_hoy}
 
         Cantidad de Ventas: {reporte['cantidad_ventas']}
-        Total de Ventas: {MONEDA}{reporte['total_ventas']:.2f}
-        Promedio por Venta: {MONEDA}{reporte['promedio_venta']:.2f}
+        Total de Ventas: {MONEDA}{reporte['total_ventas']:.0f}
+        Promedio por Venta: {MONEDA}{reporte['promedio_venta']:.0f}
 
         Métodos de Pago:
-        {chr(10).join([f"  {k}: {MONEDA}{v:.2f}" for k, v in reporte['metodos_pago'].items()])}
+        {chr(10).join([f"  {k}: {MONEDA}{v:.0f}" for k, v in reporte['metodos_pago'].items()])}
         """
         self.texto_reporte.setText(texto)
 
@@ -1186,7 +1305,7 @@ class DialogoNuevoProducto(QDialog):
         self.campo_descripcion = QLineEdit()
         self.campo_precio = QDoubleSpinBox()
         self.campo_precio.setRange(0.0, 1000000.0)
-        self.campo_precio.setDecimals(2)
+        self.campo_precio.setDecimals(0)
         self.campo_precio.setValue(0.0)
         self.campo_stock_inicial = QSpinBox()
         self.campo_stock_inicial.setRange(0, 10000)
@@ -1226,6 +1345,58 @@ class DialogoNuevoProducto(QDialog):
             'descripcion': self.campo_descripcion.text().strip(),
             'precio': self.campo_precio.value(),
             'stock_inicial': self.campo_stock_inicial.value(),
+        }
+
+
+class DialogoEditarProducto(QDialog):
+    """Diálogo para editar un producto y el precio de una presentación."""
+
+    def __init__(self, producto, presentacion, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Editar producto")
+        self.setMinimumWidth(420)
+
+        layout = QVBoxLayout()
+        form = QFormLayout()
+
+        self.campo_gtin = QLineEdit(producto.gtin or "")
+        self.campo_nombre = QLineEdit(producto.nombre or "")
+        self.campo_descripcion = QLineEdit(producto.descripcion or "")
+        self.campo_laboratorio = QLineEdit(producto.laboratorio or "")
+        self.campo_precio_venta = QDoubleSpinBox()
+        self.campo_precio_venta.setRange(1, 1000000)
+        self.campo_precio_venta.setDecimals(0)
+        self.campo_precio_venta.setValue(presentacion.precio_venta)
+
+        form.addRow("GTIN:", self.campo_gtin)
+        form.addRow("Nombre:", self.campo_nombre)
+        form.addRow("Descripción:", self.campo_descripcion)
+        form.addRow("Laboratorio:", self.campo_laboratorio)
+        form.addRow(f"Precio de venta ({presentacion.tipo.value}):", self.campo_precio_venta)
+        layout.addLayout(form)
+
+        botones = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        botones.accepted.connect(self.validar_y_aceptar)
+        botones.rejected.connect(self.reject)
+        layout.addWidget(botones)
+        self.setLayout(layout)
+
+    def validar_y_aceptar(self):
+        if not self.campo_gtin.text().strip():
+            QMessageBox.warning(self, "Validación", "El GTIN es obligatorio.")
+            return
+        if not self.campo_nombre.text().strip():
+            QMessageBox.warning(self, "Validación", "El nombre del producto es obligatorio.")
+            return
+        self.accept()
+
+    def obtener_datos(self):
+        return {
+            "gtin": self.campo_gtin.text().strip(),
+            "nombre": self.campo_nombre.text().strip(),
+            "descripcion": self.campo_descripcion.text().strip(),
+            "laboratorio": self.campo_laboratorio.text().strip() or None,
+            "precio_venta": self.campo_precio_venta.value(),
         }
 
 

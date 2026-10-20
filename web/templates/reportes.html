@@ -158,7 +158,7 @@
                     document.getElementById('reporte-inventario').innerHTML = `
                         <p>Total de Productos: <strong>${data.total_productos}</strong></p>
                         <p>Stock Total: <strong>${data.total_stock}</strong> unidades</p>
-                        <p>Valor Inventario: <strong>$${data.valor_inventario.toFixed(2)}</strong></p>
+                        <p>Valor Inventario: <strong>$${data.valor_inventario.toFixed(0)}</strong></p>
                         <p>Productos sin Stock: <strong>${data.productos_sin_stock}</strong></p>
                         <p>Productos en Alerta: <strong>${data.productos_alerta}</strong></p>
                         <p style="font-size: 0.9rem; color: #999;">Última actualización: ${new Date().toLocaleTimeString()}</p>
@@ -176,13 +176,13 @@
                 .then(data => {
                     let metodospago = '';
                     for (const [metodo, monto] of Object.entries(data.metodos_pago)) {
-                        metodospago += `<p>${metodo}: $${monto.toFixed(2)}</p>`;
+                        metodospago += `<p>${metodo}: $${monto.toFixed(0)}</p>`;
                     }
                     
                     document.getElementById('reporte-ventas').innerHTML = `
                         <p>Ventas del Día: <strong>${data.cantidad_ventas}</strong></p>
-                        <p>Total de Ventas: <strong>$${data.total_ventas.toFixed(2)}</strong></p>
-                        <p>Promedio por Venta: <strong>$${data.promedio_venta.toFixed(2)}</strong></p>
+                        <p>Total de Ventas: <strong>$${data.total_ventas.toFixed(0)}</strong></p>
+                        <p>Promedio por Venta: <strong>$${data.promedio_venta.toFixed(0)}</strong></p>
                         <p><strong>Métodos de Pago:</strong></p>
                         ${metodospago}
                         <p style="font-size: 0.9rem; color: #999;">Última actualización: ${new Date().toLocaleTimeString()}</p>
