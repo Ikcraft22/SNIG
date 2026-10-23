@@ -8,12 +8,14 @@ Maneja:
 """
 
 import logging
+import math
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
 from database.models import (
     Venta, VentaItem, Presentacion, Producto,
-    EstadoVenta, MovimientoInventario, EstadoMovimiento
+    EstadoVenta, MovimientoInventario, EstadoMovimiento,
+    registrar_evento_sync, serializar_entidad_sync,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,11 +64,14 @@ class CarritoCompra:
         Returns:
             True si se agregó exitosamente
         """
-        if cantidad <= 0:
-            logger.warning("⚠️ Cantidad debe ser mayor a 0")
+        if not isinstance(cantidad, int) or isinstance(cantidad, bool) or cantidad <= 0:
+            logger.warning("⚠️ Cantidad debe ser un entero mayor a 0")
             return False
         
-        if descuento < 0 or descuento > 100:
+        if not isinstance(precio_unitario, (int, float)) or not math.isfinite(precio_unitario) or precio_unitario <= 0:
+            logger.warning("⚠️ El precio unitario debe ser un valor positivo y finito")
+            return False
+        if not isinstance(descuento, (int, float)) or not math.isfinite(descuento) or descuento < 0 or descuento > 100:
             logger.warning("⚠️ Descuento debe estar entre 0 y 100")
             return False
 
@@ -107,8 +112,8 @@ class CarritoCompra:
     
     def modificar_cantidad_item(self, presentacion_id: int, nueva_cantidad: int) -> bool:
         """Modifica la cantidad de un ítem existente en el carrito."""
-        if nueva_cantidad <= 0:
-            logger.warning("⚠️ La nueva cantidad debe ser mayor que 0")
+        if not isinstance(nueva_cantidad, int) or isinstance(nueva_cantidad, bool) or nueva_cantidad <= 0:
+            logger.warning("⚠️ La nueva cantidad debe ser un entero mayor que 0")
             return False
         for item in self.items:
             if item["presentacion_id"] == presentacion_id:
@@ -122,7 +127,7 @@ class CarritoCompra:
 
     def aplicar_descuento_item(self, presentacion_id: int, descuento_porcentaje: float) -> bool:
         """Modifica el porcentaje de descuento de un ítem en el carrito."""
-        if descuento_porcentaje < 0 or descuento_porcentaje > 100:
+        if not isinstance(descuento_porcentaje, (int, float)) or not math.isfinite(descuento_porcentaje) or descuento_porcentaje < 0 or descuento_porcentaje > 100:
             logger.warning("⚠️ Descuento debe estar entre 0 y 100")
             return False
         for item in self.items:
@@ -223,8 +228,37 @@ class GestorPOS:
         if not self.carrito.items:
             logger.error("❌ El carrito está vacío")
             return None
-        
+        if not isinstance(numero_ticket, str) or not numero_ticket.strip():
+            logger.warning("⚠️ El número de ticket es obligatorio")
+            return None
+        if metodo_pago not in {"efectivo", "tarjeta", "transferencia"}:
+            logger.warning(f"⚠️ Método de pago inválido: {metodo_pago}")
+            return None
+
         try:
+            for item in self.carrito.items:
+                cantidad = item.get("cantidad")
+                precio_unitario = item.get("precio_unitario")
+                descuento = item.get("descuento_porcentaje", 0)
+                if not isinstance(cantidad, int) or isinstance(cantidad, bool) or cantidad <= 0:
+                    raise ValueError("Cada cantidad de venta debe ser un entero mayor que cero")
+                if not isinstance(precio_unitario, (int, float)) or not math.isfinite(precio_unitario) or precio_unitario <= 0:
+                    raise ValueError("Cada precio de venta debe ser positivo y finito")
+                if not isinstance(descuento, (int, float)) or not math.isfinite(descuento) or not 0 <= descuento <= 100:
+                    raise ValueError("Cada descuento debe estar entre 0 y 100")
+                presentacion = self.db.query(Presentacion.id).filter(
+                    Presentacion.id == item["presentacion_id"],
+                    Presentacion.producto_id == item["producto_id"],
+                ).first()
+                if not presentacion:
+                    raise ValueError("La presentación de un artículo no pertenece al producto indicado")
+                subtotal_bruto = cantidad * precio_unitario
+                item["descuento_cantidad"] = subtotal_bruto * descuento / 100
+                item["subtotal"] = round(subtotal_bruto - item["descuento_cantidad"])
+            self.carrito._recalcular()
+            if self.carrito.total <= 0:
+                raise ValueError("El total de la venta debe ser mayor que cero")
+
             # Crear venta
             venta = Venta(
                 numero_ticket=numero_ticket,
@@ -250,13 +284,39 @@ class GestorPOS:
                 )
                 venta.items.append(venta_item)
                 
-                # Registrar movimiento de inventario (salida)
-                self._registrar_salida_inventario(
-                    item["producto_id"],
-                    item["presentacion_id"],
-                    item["cantidad"],
-                    usuario,
-                    numero_ticket
+                # El descuento condicional evita vender stock que otra operación ya agotó.
+                actualizado = self.db.query(Presentacion).filter(
+                    Presentacion.id == item["presentacion_id"],
+                    Presentacion.producto_id == item["producto_id"],
+                    Presentacion.stock_actual >= item["cantidad"],
+                ).update(
+                    {Presentacion.stock_actual: Presentacion.stock_actual - item["cantidad"]},
+                    synchronize_session=False,
+                )
+                if not actualizado:
+                    raise ValueError(
+                        f"Stock insuficiente para la presentación {item['presentacion_id']}"
+                    )
+                presentacion_actualizada = self.db.query(Presentacion).populate_existing().filter(
+                    Presentacion.id == item["presentacion_id"]
+                ).one()
+                registrar_evento_sync(
+                    self.db.connection(),
+                    "presentaciones",
+                    presentacion_actualizada.id,
+                    "upsert",
+                    serializar_entidad_sync(Presentacion, presentacion_actualizada),
+                )
+                self.db.add(
+                    MovimientoInventario(
+                        producto_id=item["producto_id"],
+                        presentacion_id=item["presentacion_id"],
+                        tipo_movimiento=EstadoMovimiento.SALIDA,
+                        cantidad=item["cantidad"],
+                        razon="Venta POS",
+                        usuario=usuario,
+                        referencia_externa=numero_ticket,
+                    )
                 )
             
             self.db.add(venta)

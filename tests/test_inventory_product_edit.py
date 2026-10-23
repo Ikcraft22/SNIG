@@ -136,6 +136,17 @@ def test_dialogos_de_producto_solo_aceptan_precios_enteros():
 
     assert dialogo_nuevo.campo_precio.decimals() == 0
     assert dialogo_editar.campo_precio_venta.decimals() == 0
+    assert dialogo_nuevo.campo_gtin.placeholderText()
+    assert dialogo_nuevo.campo_stock_inicial.suffix() == " unidades"
+    dialogo_nuevo.campo_gtin.setText("1234567890123")
+    dialogo_nuevo.campo_nombre.setText("Producto nuevo")
+    dialogo_nuevo.campo_descripcion.setPlainText("Descripción de prueba")
+    dialogo_nuevo.campo_precio.setValue(2500)
+    assert dialogo_nuevo.obtener_datos()["descripcion"] == "Descripción de prueba"
+    assert any(
+        button.text() == "Guardar producto"
+        for button in dialogo_nuevo.findChildren(gui_ui.QPushButton)
+    )
 
 
 def test_menu_inventario_incluye_edicion_y_usa_presentacion_seleccionada(monkeypatch):

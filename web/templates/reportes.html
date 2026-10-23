@@ -1,246 +1,148 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reportes</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SNIG - Reportes</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/switch.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
-            min-height: 100vh;
-            padding: 2rem;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 10px;
-            padding: 2rem;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-        }
-        
-        h1 {
-            color: #3182ce;
-            margin-bottom: 2rem;
-            border-bottom: 2px solid #3182ce;
-            padding-bottom: 1rem;
-        }
-        
-        .reportes-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-bottom: 2rem;
-        }
-        
-        .reporte-card {
-            background: #f7f7f7;
-            padding: 1.5rem;
-            border-radius: 8px;
-            border-left: 4px solid #3182ce;
-        }
-        
-        .reporte-card h2 {
-            color: #3182ce;
-            margin-bottom: 1rem;
-            font-size: 1.3rem;
-        }
-        
-        .reporte-card p {
-            color: #666;
-            line-height: 1.8;
-            margin-bottom: 0.5rem;
-        }
-        
-        .reporte-valor {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #3182ce;
-            margin: 1rem 0;
-        }
-        
-        button {
-            padding: 0.75rem 1.5rem;
-            background: #3182ce;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background 0.3s;
-            margin-top: 1rem;
-        }
-        
-        button:hover {
-            background: #2c5aa0;
-        }
-        
-        .back-btn {
-            background: #666;
-        }
-        
-        .back-btn:hover {
-            background: #555;
-        }
-        
-        .loading {
-            text-align: center;
-            color: #3182ce;
-        }
-    <link rel="stylesheet" href="/static/css/switch.css">
+        body { background: var(--color-bg); color: var(--color-text); }
+        .reportes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-top: 1.25rem; }
+        .reporte-card { min-height: 220px; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1.25rem; }
+        .kpi-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem; box-shadow: var(--shadow-sm); }
+        .kpi-card strong { display: block; margin-top: 0.5rem; font-size: 1.5rem; color: var(--color-primary); font-variant-numeric: tabular-nums; }
+        .status-list { list-style: none; padding: 0; margin: 0.8rem 0 0; display: grid; gap: 0.5rem; }
+        .status-list li { background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 0.6rem 0.7rem; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-            <h1 style="margin-bottom: 0; padding-bottom: 0; border-bottom: none;">📊 Reportes</h1>
-            <div style="display: flex; align-items: center; gap: 1.5rem;">
-                <label class="switch" for="theme-switch" title="Cambiar modo claro / oscuro">
-                    <input type="checkbox" id="theme-switch" />
-                    <div class="sunmoon">
-                        <div class="darkside"></div>
-                    </div>
-                    <div class="border"></div>
-                    <div class="clouds">
-                        <img src="/static/img/cloud_1.svg" alt="" class="cloud cloud-1" />
-                        <img src="/static/img/cloud_2.svg" alt="" class="cloud cloud-2" />
-                        <img src="/static/img/cloud_3.svg" alt="" class="cloud cloud-3" />
-                        <img src="/static/img/cloud_4.svg" alt="" class="cloud cloud-4" />
-                        <img src="/static/img/stars.svg" alt="" class="stars" />
-                    </div>
-                </label>
-                <button class="back-btn" style="margin-top: 0;" onclick="location.href='/'">⬅️ Volver</button>
-            </div>
+    <a class="skip-link" href="#main-content">Saltar al contenido principal</a>
+    <nav aria-label="Navegación principal">
+        <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+            <a href="/">🏠 Inicio</a>
+            <a href="/inventario">📦 Inventario</a>
+            <a href="/pos">🛒 POS</a>
+            <a href="/reportes">📊 Reportes</a>
         </div>
-        
-        <div style="margin-bottom: 2rem; background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 1.2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-            <div>
-                <h3 style="color: #2b6cb0; margin-bottom: 0.3rem;">🚀 Dashboard Avanzado en Streamlit</h3>
-                <p style="color: #4a5568; font-size: 0.95rem;">Explora gráficos interactivos (Barras, Líneas, Dona, Treemap, Áreas) y descarga en Excel/CSV.</p>
-            </div>
-            <a href="http://localhost:8501" target="_blank" style="background: #3182ce; color: white; padding: 0.75rem 1.5rem; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">Abrir Streamlit 📊</a>
+        <div class="theme-switch-wrapper">
+            <label class="switch" for="theme-switch">
+                <input type="checkbox" id="theme-switch" aria-label="Activar modo oscuro" />
+                <div class="sunmoon"><div class="darkside"></div></div>
+                <div class="border"></div>
+                <div class="clouds">
+                    <img src="{{ url_for('static', filename='img/cloud_1.svg') }}" alt="" class="cloud cloud-1" />
+                    <img src="{{ url_for('static', filename='img/cloud_2.svg') }}" alt="" class="cloud cloud-2" />
+                    <img src="{{ url_for('static', filename='img/cloud_3.svg') }}" alt="" class="cloud cloud-3" />
+                    <img src="{{ url_for('static', filename='img/cloud_4.svg') }}" alt="" class="cloud cloud-4" />
+                    <img src="{{ url_for('static', filename='img/stars.svg') }}" alt="" class="stars" />
+                </div>
+            </label>
+        </div>
+    </nav>
+
+    <main class="container" id="main-content">
+        <div class="panel-head">
+            <h1 style="margin:0;">📊 Reportes y métricas</h1>
+            <button class="btn" type="button" onclick="location.href='/'">⬅️ Volver</button>
         </div>
 
-        <div class="reportes-grid" id="reportes-container">
-            <div class="reporte-card">
-                <h2>📦 Inventario</h2>
-                <p id="reporte-inventario">Cargando...</p>
-                <button onclick="cargarReporteInventario()">Actualizar</button>
-            </div>
-            
-            <div class="reporte-card">
-                <h2>🛒 Ventas Diarias</h2>
-                <p id="reporte-ventas">Cargando...</p>
-                <button onclick="cargarReporteVentas()">Actualizar</button>
-            </div>
-            
-            <div class="reporte-card">
-                <h2>⚠️ Stock Bajo</h2>
-                <p id="reporte-stock-bajo">Cargando...</p>
-                <button onclick="cargarStockBajo()">Actualizar</button>
-            </div>
+        <section class="reporte-card" aria-labelledby="streamlit-title" style="margin-top:1.25rem;">
+            <h2 id="streamlit-title">🚀 Dashboard avanzado</h2>
+            <p>El sistema incluye un panel interactivo en Streamlit con visualización de ventas, gráficos, inventario y exportación de datos.</p>
+            <a class="btn btn-info" href="http://localhost:8501" target="_blank" rel="noopener noreferrer">Abrir Streamlit</a>
+        </section>
+
+        <div class="kpi-grid">
+            <div class="kpi-card"><span class="muted">Productos</span><strong id="kpi-productos">0</strong></div>
+            <div class="kpi-card"><span class="muted">Stock total</span><strong id="kpi-stock">0</strong></div>
+            <div class="kpi-card"><span class="muted">Valor inventario</span><strong id="kpi-valor">$0</strong></div>
+            <div class="kpi-card"><span class="muted">Alertas stock</span><strong id="kpi-alerta">0</strong></div>
         </div>
-        
-        <button class="back-btn" onclick="location.href='/'">⬅️ Volver</button>
-    </div>
-    
+
+        <div class="reportes-grid">
+            <section class="reporte-card" aria-labelledby="inventory-report-title">
+                <h2 id="inventory-report-title">📦 Inventario</h2>
+                <div id="reporte-inventario">Cargando...</div>
+                <button type="button" class="btn btn-primary" onclick="cargarReportes()">Actualizar</button>
+            </section>
+
+            <section class="reporte-card" aria-labelledby="sales-report-title">
+                <h2 id="sales-report-title">🛒 Ventas</h2>
+                <div id="reporte-ventas">Cargando...</div>
+                <button type="button" class="btn btn-success" onclick="cargarReportes()">Actualizar</button>
+            </section>
+
+            <section class="reporte-card" aria-labelledby="stock-report-title">
+                <h2 id="stock-report-title">⚠️ Stock bajo</h2>
+                <div id="reporte-stock-bajo">Cargando...</div>
+                <button type="button" class="btn btn-info" onclick="cargarReportes()">Actualizar</button>
+            </section>
+        </div>
+    </main>
+
     <script>
-        function cargarReporteInventario() {
-            fetch('/api/inventario/reporte')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('reporte-inventario').innerHTML = `
-                        <p>Total de Productos: <strong>${data.total_productos}</strong></p>
-                        <p>Stock Total: <strong>${data.total_stock}</strong> unidades</p>
-                        <p>Valor Inventario: <strong>$${data.valor_inventario.toFixed(0)}</strong></p>
-                        <p>Productos sin Stock: <strong>${data.productos_sin_stock}</strong></p>
-                        <p>Productos en Alerta: <strong>${data.productos_alerta}</strong></p>
-                        <p style="font-size: 0.9rem; color: #999;">Última actualización: ${new Date().toLocaleTimeString()}</p>
-                    `;
-                })
-                .catch(error => {
-                    document.getElementById('reporte-inventario').innerHTML = `Error: ${error.message}`;
-                });
-        }
-        
-        function cargarReporteVentas() {
-            const hoy = new Date().toISOString().split('T')[0];
-            fetch(`/api/ventas/reporte/${hoy}`)
-                .then(response => response.json())
-                .then(data => {
-                    let metodospago = '';
-                    for (const [metodo, monto] of Object.entries(data.metodos_pago)) {
-                        metodospago += `<p>${metodo}: $${monto.toFixed(0)}</p>`;
-                    }
-                    
-                    document.getElementById('reporte-ventas').innerHTML = `
-                        <p>Ventas del Día: <strong>${data.cantidad_ventas}</strong></p>
-                        <p>Total de Ventas: <strong>$${data.total_ventas.toFixed(0)}</strong></p>
-                        <p>Promedio por Venta: <strong>$${data.promedio_venta.toFixed(0)}</strong></p>
-                        <p><strong>Métodos de Pago:</strong></p>
-                        ${metodospago}
-                        <p style="font-size: 0.9rem; color: #999;">Última actualización: ${new Date().toLocaleTimeString()}</p>
-                    `;
-                })
-                .catch(error => {
-                    document.getElementById('reporte-ventas').innerHTML = `Error: ${error.message}`;
-                });
-        }
-        
-        function cargarStockBajo() {
-            fetch('/api/inventario/stock-bajo')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.length === 0) {
-                        document.getElementById('reporte-stock-bajo').innerHTML = '<p>✅ Todos los productos tienen stock adecuado</p>';
-                    } else {
-                        let html = `<p>⚠️ ${data.length} producto(s) con stock bajo:</p>`;
-                        data.forEach(p => {
-                            html += `<p>${p.nombre} (${p.presentacion}): ${p.stock_actual}/${p.stock_minimo}</p>`;
-                        });
-                        document.getElementById('reporte-stock-bajo').innerHTML = html;
-                    }
-                })
-                .catch(error => {
-                    document.getElementById('reporte-stock-bajo').innerHTML = `Error: ${error.message}`;
-                });
-        }
-        
-        // Cargar reportes al iniciar
-        cargarReporteInventario();
-        cargarReporteVentas();
-        cargarStockBajo();
-        
-        // Actualizar cada 30 segundos
-        setInterval(() => {
-            cargarReporteInventario();
-            cargarReporteVentas();
-            cargarStockBajo();
-        }, 30000);
-
         const themeSwitch = document.getElementById('theme-switch');
-        const currentTheme = localStorage.getItem('theme');
-        if (currentTheme === 'dark') {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
             document.body.classList.add('dark');
             if (themeSwitch) themeSwitch.checked = true;
         }
         if (themeSwitch) {
-            themeSwitch.addEventListener('change', function(e) {
-                if (e.target.checked) {
-                    document.body.classList.add('dark');
-                    localStorage.setItem('theme', 'dark');
-                } else {
-                    document.body.classList.remove('dark');
-                    localStorage.setItem('theme', 'light');
-                }
+            themeSwitch.addEventListener('change', function (event) {
+                const isDark = event.target.checked;
+                document.body.classList.toggle('dark', isDark);
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
             });
         }
+
+        function formatCurrency(value) {
+            return '$' + Number(value || 0).toLocaleString('es-CO');
+        }
+
+        async function cargarReportes() {
+            try {
+                const [inventarioRes, ventasRes, stockBajoRes] = await Promise.all([
+                    fetch('/api/inventario/reporte'),
+                    fetch('/api/ventas'),
+                    fetch('/api/inventario/stock-bajo')
+                ]);
+
+                const inventario = await inventarioRes.json();
+                const ventas = await ventasRes.json();
+                const stockBajo = await stockBajoRes.json();
+
+                document.getElementById('kpi-productos').textContent = inventario.total_productos ?? 0;
+                document.getElementById('kpi-stock').textContent = inventario.total_stock ?? 0;
+                document.getElementById('kpi-valor').textContent = formatCurrency(inventario.valor_inventario);
+                document.getElementById('kpi-alerta').textContent = inventario.productos_alerta ?? 0;
+
+                document.getElementById('reporte-inventario').innerHTML = `
+                    <p><strong>Total productos:</strong> ${inventario.total_productos ?? 0}</p>
+                    <p><strong>Stock total:</strong> ${inventario.total_stock ?? 0}</p>
+                    <p><strong>Valor del inventario:</strong> ${formatCurrency(inventario.valor_inventario)}</p>
+                    <p><strong>Productos sin stock:</strong> ${inventario.productos_sin_stock ?? 0}</p>
+                `;
+
+                const totalVentas = Array.isArray(ventas) ? ventas.reduce((sum, item) => sum + Number(item.total || 0), 0) : 0;
+                document.getElementById('reporte-ventas').innerHTML = `
+                    <p><strong>Ventas registradas:</strong> ${Array.isArray(ventas) ? ventas.length : 0}</p>
+                    <p><strong>Ingreso total:</strong> ${formatCurrency(totalVentas)}</p>
+                    <p><strong>Última venta:</strong> ${Array.isArray(ventas) && ventas.length ? ventas[0].numero_ticket : 'Sin ventas'}</p>
+                `;
+
+                const itemsStock = Array.isArray(stockBajo) ? stockBajo.slice(0, 5) : [];
+                document.getElementById('reporte-stock-bajo').innerHTML = itemsStock.length
+                    ? `<ul class="status-list">${itemsStock.map((item) => `<li><strong>${item.nombre}</strong> — ${item.urgencia}: ${item.stock_actual} unidades</li>`).join('')}</ul>`
+                    : '<p>No hay alertas de stock bajo.</p>';
+            } catch (error) {
+                document.getElementById('reporte-inventario').textContent = 'Error al cargar datos.';
+                console.error(error);
+            }
+        }
+
+        cargarReportes();
     </script>
 </body>
 </html>

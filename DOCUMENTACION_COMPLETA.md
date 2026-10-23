@@ -1,6 +1,6 @@
 # Documentación completa del sistema
 
-Fecha de actualización: 20 de octubre de 2026
+Fecha de actualización: 23 de octubre de 2026
 Versión: 1.2.0
 Estado: funcional
 
@@ -19,6 +19,7 @@ El sistema permite:
 - generar reportes y analítica visual interactiva con múltiples tipos de gráficas (Streamlit + Plotly)
 - exportar reportes consolidados en formato Excel (`.xlsx`) y CSV
 - recordar automáticamente las preferencias de tema (Modo Oscuro / Claro)
+- gestionar proveedores y asignarles productos del catálogo
 - usar varias interfaces: GUI (PyQt5), Dashboard de Reportes (Streamlit), terminal y web (Flask)
 - trabajar con una experiencia optimizada para pantallas táctiles y escritorios
 
@@ -52,17 +53,25 @@ Modelos clave:
 - `Venta`
 - `VentaItem`
 - `Usuario`
+- `Proveedor`
+- `productos_proveedores` (relación muchos-a-muchos entre proveedores y productos)
 
 ### 4.2 Interfaz gráfica (PyQt5)
 
-La GUI maneja pestañas principales:
+La GUI de escritorio presenta un panel principal y navegación lateral:
 
-- **📦 Inventario**: Catálogo de productos, stock en tiempo real, búsqueda y acciones rápidas.
-- **🛒 POS**: Punto de venta con escaneo de GTIN, carrito interactivo y cobro numérico rápido.
+- **Inicio**: resumen de productos, unidades en stock, valorización y alertas, además de accesos rápidos.
+- **📦 Inventario**: Catálogo con búsqueda, stock, precios, proveedor y acciones rápidas.
+- **🛒 POS**: Punto de venta con escaneo de GTIN, carrito interactivo y cobro con Efectivo o Transferencia.
 - **📊 Reportes**: Resumen de indicadores y botón directo `🚀 Abrir Dashboard Gráfico en Streamlit`.
-- **📝 Logs**: Registro de actividad del sistema.
+- **🏭 Proveedores**: Altas, edición, eliminación y asignación de productos a proveedores.
+- **📝 Logs**: Registro de actividad del sistema, oculto hasta solicitarlo.
 
-Incluye interruptor animado de tema Día / Noche con **persistencia automática de memoria** entre sesiones en `.startup_state.json`.
+Incluye interruptor animado de tema Día / Noche con persistencia automática entre sesiones en `.startup_state.json`. El cambio de tema mantiene el tamaño y la sección activa de la ventana.
+
+Los formularios de producto, proveedor y asignación de productos incluyen textos de ayuda, campos de búsqueda cuando corresponde, validación y apariencia compatible con el tema activo. En la tabla de inventario, la columna **Proveedor** muestra los proveedores asociados o **Sin proveedor**. Eliminar un proveedor no elimina sus productos.
+
+El pago se puede seleccionar con botones o mediante las teclas **1** (Efectivo) y **2** (Transferencia).
 
 ### 4.3 Módulo de Reportes y Analítica (Streamlit + Plotly)
 
@@ -81,11 +90,13 @@ Ubicado en `reporting/streamlit_reports.py`, provee:
   2. *📦 Inventario & Stock*: Existencias, valorización del almacén y semáforo de alerta crítica.
   3. *🔄 Movimientos & Kardex*: Auditoría histórica de Entradas, Salidas y Ajustes.
   4. *🎨 Explorador Gráfico Personalizado (Custom Chart Studio)*: Permite al usuario cruzar cualquier dimensión y métrica, y escoger libremente el tipo de gráfica a renderizar.
-  5. *📥 Centro de Exportación*: Generación y descarga de libro Excel (`.xlsx`) multitabla y archivos `.csv`.
+  5. *📥 Centro de Exportación*: Generación y descarga de reportes PDF, libro Excel (`.xlsx`) multitabla y archivos `.csv`.
 
 ### 4.4 Interfaz web (Flask)
 
 La web se ejecuta con Flask (`web/app.py`) y ofrece acceso HTTP a distintos endpoints y vistas del sistema, incluyendo enlace directo al servidor Streamlit.
+
+Las interfaces web incorporan enlace para saltar al contenido, estructura semántica, etiquetas de formulario y anuncios de estado, además de foco visible, soporte de movimiento reducido y controles de tema operables por teclado. El dashboard de Streamlit conserva alternativas tabulares para las gráficas y foco visible; la GUI Qt expone nombres y descripciones accesibles y resaltado de foco. Son mejoras de accesibilidad, no una certificación formal WCAG.
 
 ## 5. Configuración
 
@@ -95,6 +106,8 @@ La web se ejecuta con Flask (`web/app.py`) y ofrece acceso HTTP a distintos endp
 DB_ENGINE=sqlite
 SQLITE_FILE=./inventario.db
 ```
+
+SQLite usa WAL y espera hasta 30 segundos ante bloqueos de escritura. El API de productos conserva la respuesta de lista completa si se consulta sin parámetros; para paginar, usa `GET /api/productos?page=1&per_page=50` (máximo 100 por página). Las ventas y movimientos descuentan o ajustan stock con operaciones condicionales para impedir existencias negativas ante escrituras simultáneas.
 
 ### 5.2 MySQL (opcional)
 
@@ -221,7 +234,7 @@ pip install flask
 
 ---
 
-Última actualización: 20 de octubre de 2026
+Última actualización: 23 de octubre de 2026
 Versión actual: 1.2.0
 # APIs (Opcional)
 GOOGLE_API_KEY=                    # Obtén desde Google Cloud Console
@@ -671,8 +684,11 @@ GET  /pos                       # Página de POS
 GET  /reportes                  # Página de reportes
 
 GET  /api/productos             # Listar productos
+GET  /api/productos?page=1&per_page=50 # Listar productos paginados (máximo 100)
 GET  /api/productos/<gtin>      # Obtener producto
 POST /api/productos             # Crear producto
+GET  /api/sync/cursor            # Obtener cursor antes de descargar el estado inicial
+GET  /api/sync/changes?cursor=0&limit=100 # Obtener cambios incrementales (máximo 500)
 GET  /api/buscar-gtin/<gtin>   # Buscar en APIs externas
 
 GET  /api/inventario/stock-bajo # Productos con stock bajo
@@ -682,6 +698,8 @@ GET  /api/inventario/reporte    # Reporte de inventario
 GET  /api/ventas                # Listar ventas
 GET  /api/ventas/reporte/<fecha> # Reporte de ventas
 ```
+
+Para preparar un cliente móvil, consulta primero `/api/sync/cursor`, descarga el catálogo usando `/api/productos?page=...&per_page=...` y luego consume `/api/sync/changes` desde ese cursor. Persiste `next_cursor` solo después de aplicar los cambios recibidos. El feed devuelve eventos `upsert`/`delete` para productos, presentaciones, movimientos, ventas y sus detalles en orden transaccional. Esta primera fase permite sincronización incremental de lectura; todavía no acepta escrituras móviles, autenticación ni resolución distribuida de conflictos.
 
 ---
 
@@ -1239,12 +1257,7 @@ self.impuesto = self.subtotal * 0.19
 
 ### ¿Puedo exportar reportes a PDF?
 
-**Sí, agregando:**
-```bash
-pip install reportlab
-```
-
-Luego crear función en `core/` para generar PDF.
+**Sí.** En el Centro de Exportación del dashboard de Streamlit puedes descargar un reporte PDF con los datos filtrados, un resumen de ventas e inventario y las tablas disponibles. ReportLab se instala junto con las dependencias del proyecto.
 
 ### ¿Cómo hacer backups automáticos?
 
@@ -1304,7 +1317,7 @@ class ProductosAPI:
 - [ ] Historial de accesos
 
 ### v1.2.0 - Reportes Avanzados
-- [ ] Exportación a PDF
+- [x] Exportación a PDF
 - [ ] Exportación a Excel
 - [ ] Gráficas estadísticas
 - [ ] Predicción de stock
@@ -1312,6 +1325,7 @@ class ProductosAPI:
 
 ### v1.3.0 - Integración Móvil
 - [ ] App móvil (React Native)
+- [x] API REST base para sincronización incremental de cambios
 - [ ] Sincronización en tiempo real (WebSockets)
 - [ ] Modo offline
 
@@ -1622,31 +1636,27 @@ Ganancia potencial: $26,830.00
 Margen promedio:  37.2%
 ```
 
+#### 16.4 Panel de escritorio y proveedores
+
+- La navegación lateral ofrece Inicio, Inventario, Punto de venta, Reportes y Proveedores.
+- El panel Inicio resume productos, stock, valor del inventario y alertas actuales.
+- La pantalla Proveedores permite crear, editar y eliminar proveedores, y asignarles varios productos.
+- La tabla de inventario incluye la columna **Proveedor**. Si no hay una relación asignada, muestra **Sin proveedor**.
+- El diálogo de asignación permite filtrar productos por nombre o GTIN y muestra el número de seleccionados.
+- Los diálogos de producto y proveedor incluyen campos guiados, botones con acciones claras y estilos para ambos temas.
+- El selector de pago de escritorio ofrece Efectivo y Transferencia con botones y teclas `1` y `2`.
+- El interruptor Día / Noche anima el sol/luna y el cielo; el tema se aplica al terminar la transición.
+
 ---
 
-### 17. Suite de pruebas (v1.2.0)
+### 17. Pruebas automatizadas
 
-El proyecto cuenta ahora con **28 pruebas automatizadas** distribuidas en 11 archivos:
-
-| Archivo | Pruebas | Descripción |
-|---------|---------|-------------|
-| `test_inventory_advanced.py` | 5 | Búsqueda, valorización, reabastecimiento, CSV, backup |
-| `test_pos_advanced.py` | 2 | Carrito con modificaciones y cierre de caja |
-| `test_barcode_generator.py` | 2 | Generación GTIN-13 con checksum EAN válido |
-| `test_web_api.py` | 5 | Endpoints REST: financiero, reabastecimiento, CSV, backup, cierre |
-| `test_inventory_product_edit.py` | 3 | Edición de productos en GUI |
-| `test_pos_cash_change.py` | 3 | Cálculo de vuelto en POS |
-| `test_gui_theme.py` | 3 | Persistencia del tema GUI |
-| `test_switch_dia_noche.py` | 2 | Interruptor día/noche |
-| `test_seed_products.py` | 1 | Carga de datos demo tienda escolar |
-| `test_streamlit_reports.py` | 1 | Preparación datos dashboard |
-| `test_barcode_scanner.py` | 1 | Scanner GTIN básico |
+La suite cubre inventario y POS, API web, reportes y la interfaz gráfica. Incluye pruebas de las relaciones proveedor-producto, asignación de productos, columna de proveedores y formularios adaptados al tema.
 
 Ejecutar todos los tests:
 
 ```bash
 python -m pytest
-# 28 passed, 5 warnings
 ```
 
 ---
@@ -1655,7 +1665,7 @@ python -m pytest
 
 - [opensource-coding/Dark-Light-Mode-Switch](https://github.com/opensource-coding/Dark-Light-Mode-Switch) — componente de interruptor de modo oscuro/claro integrado en la interfaz web del proyecto.
 
-**Última actualización**: 20 de octubre de 2026
+**Última actualización**: 23 de octubre de 2026
 **Versión**: 1.2.0
 **Estado**: Producción  
 **Autor**: GitHub Copilot

@@ -8,6 +8,7 @@ Maneja:
 """
 
 import logging
+import math
 import os
 import shutil
 import csv
@@ -18,7 +19,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from database.models import (
     Producto, Presentacion, MovimientoInventario, VentaItem,
-    EstadoMovimiento, TipoPresentacion
+    EstadoMovimiento, TipoPresentacion, registrar_evento_sync, serializar_entidad_sync
 )
 from api.gtin_lookup import GTINBuscador
 from config.settings import SQLITE_FILE, BASE_DIR
@@ -57,6 +58,15 @@ class GestorInventario:
         Returns:
             Objeto Producto creado
         """
+        if not isinstance(gtin, str) or not gtin.strip():
+            logger.warning("⚠️ El GTIN es obligatorio")
+            return None
+        if not isinstance(nombre, str) or not nombre.strip():
+            logger.warning("⚠️ El nombre del producto es obligatorio")
+            return None
+
+        gtin = gtin.strip()
+        nombre = nombre.strip()
         try:
             # Verificar si ya existe
             producto_existente = self.db.query(Producto).filter(Producto.gtin == gtin).first()
@@ -107,7 +117,27 @@ class GestorInventario:
         Returns:
             Objeto Presentacion creado
         """
+        if not isinstance(cantidad, int) or isinstance(cantidad, bool) or cantidad <= 0:
+            logger.warning("⚠️ La cantidad por presentación debe ser un entero mayor que cero")
+            return None
+        if not isinstance(stock_inicial, int) or isinstance(stock_inicial, bool) or stock_inicial < 0:
+            logger.warning("⚠️ El stock inicial debe ser un entero no negativo")
+            return None
+        if not all(
+            isinstance(valor, (int, float)) and math.isfinite(valor)
+            for valor in (precio_unitario, precio_venta)
+        ):
+            logger.warning("⚠️ Los precios deben ser valores numéricos finitos")
+            return None
+        if precio_unitario < 0 or precio_venta <= 0:
+            logger.warning("⚠️ El costo no puede ser negativo y el precio de venta debe ser positivo")
+            return None
+
         try:
+            if not self.db.query(Producto.id).filter(Producto.id == producto_id).first():
+                logger.warning(f"⚠️ Producto no encontrado para agregar presentación: {producto_id}")
+                return None
+
             presentacion = Presentacion(
                 producto_id=producto_id,
                 tipo=TipoPresentacion(tipo_presentacion),
@@ -154,15 +184,52 @@ class GestorInventario:
         Returns:
             Objeto MovimientoInventario creado
         """
+        if not isinstance(cantidad, int) or isinstance(cantidad, bool) or cantidad == 0:
+            logger.warning("⚠️ La cantidad del movimiento debe ser un entero distinto de cero")
+            return None
+        if isinstance(tipo, EstadoMovimiento):
+            tipo = tipo.value
+        if not isinstance(tipo, str) or tipo not in {estado.value for estado in EstadoMovimiento}:
+            logger.warning(f"⚠️ Tipo de movimiento inválido: {tipo}")
+            return None
+        if tipo != EstadoMovimiento.AJUSTE.value and cantidad < 0:
+            logger.warning("⚠️ Entradas, salidas y devoluciones requieren una cantidad positiva")
+            return None
+
         try:
-            # Obtener presentación
-            presentacion = self.db.query(Presentacion).filter(
-                Presentacion.id == presentacion_id
-            ).first()
-            
-            if not presentacion:
-                logger.error(f"❌ Presentación no encontrada: {presentacion_id}")
+            cambio_stock = -cantidad if tipo == EstadoMovimiento.SALIDA.value else cantidad
+            filtros = [
+                Presentacion.id == presentacion_id,
+                Presentacion.producto_id == producto_id,
+            ]
+            if cambio_stock < 0:
+                filtros.append(Presentacion.stock_actual >= -cambio_stock)
+
+            actualizadas = self.db.query(Presentacion).filter(*filtros).update(
+                {Presentacion.stock_actual: Presentacion.stock_actual + cambio_stock},
+                synchronize_session=False,
+            )
+            if not actualizadas:
+                presentacion_existe = self.db.query(Presentacion.id).filter(
+                    Presentacion.id == presentacion_id,
+                    Presentacion.producto_id == producto_id,
+                ).first()
+                if presentacion_existe:
+                    logger.warning("⚠️ El movimiento dejaría el stock en un valor negativo")
+                else:
+                    logger.error(f"❌ Presentación no encontrada para el producto: {presentacion_id}")
                 return None
+
+            presentacion = self.db.query(Presentacion).populate_existing().filter(
+                Presentacion.id == presentacion_id
+            ).one()
+            registrar_evento_sync(
+                self.db.connection(),
+                "presentaciones",
+                presentacion.id,
+                "upsert",
+                serializar_entidad_sync(Presentacion, presentacion),
+            )
             
             # Crear movimiento
             movimiento = MovimientoInventario(
@@ -174,18 +241,6 @@ class GestorInventario:
                 usuario=usuario,
                 referencia_externa=referencia
             )
-            
-            # Actualizar stock
-            if tipo in ["entrada", "devolucion"]:
-                presentacion.stock_actual += cantidad
-            elif tipo == "salida":
-                if presentacion.stock_actual < cantidad:
-                    logger.error(f"❌ Stock insuficiente para {presentacion.tipo}")
-                    return None
-                presentacion.stock_actual -= cantidad
-            elif tipo == "ajuste":
-                # ajuste puede ser positivo o negativo
-                presentacion.stock_actual += cantidad
             
             self.db.add(movimiento)
             self.db.commit()
@@ -347,15 +402,19 @@ class GestorInventario:
         Returns:
             Lista de productos con stock bajo
         """
-        presentaciones = self.db.query(Presentacion).all()
-        
+        if not isinstance(umbral_porcentaje, (int, float)) or not math.isfinite(umbral_porcentaje) or not 0 <= umbral_porcentaje <= 1:
+            logger.warning("⚠️ El umbral debe ser un porcentaje entre 0 y 1")
+            return []
+
         productos_alerta = []
-        for p in presentaciones:
-            if p.stock_actual <= (p.stock_minimo * (1 - umbral_porcentaje)):
-                producto = self.db.query(Producto).filter(
-                    Producto.id == p.producto_id
-                ).first()
-                
+        presentaciones = self.db.query(Presentacion, Producto).join(
+            Producto, Producto.id == Presentacion.producto_id
+        ).all()
+        for p, producto in presentaciones:
+            if p.stock_actual <= p.stock_minimo:
+                es_critico = p.stock_actual == 0 or (
+                    p.stock_minimo > 0 and p.stock_actual <= p.stock_minimo * umbral_porcentaje
+                )
                 productos_alerta.append({
                     "producto_id": p.producto_id,
                     "gtin": producto.gtin,
@@ -363,7 +422,7 @@ class GestorInventario:
                     "presentacion": p.tipo.value,
                     "stock_actual": p.stock_actual,
                     "stock_minimo": p.stock_minimo,
-                    "urgencia": "CRÍTICO" if p.stock_actual == 0 else "BAJO"
+                    "urgencia": "CRÍTICO" if es_critico else "BAJO"
                 })
         
         return productos_alerta

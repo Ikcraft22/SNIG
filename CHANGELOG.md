@@ -1,5 +1,19 @@
 # CHANGELOG - Historial de Cambios
 
+## [Sin publicar]
+
+### Agregado
+- ✅ API de sincronización incremental con cursor persistente y feed transaccional de cambios para preparar clientes móviles.
+- ✅ Catálogo de proveedores con datos de contacto y relación con varios productos.
+- ✅ Columna de proveedor en la tabla de inventario de escritorio.
+- ✅ Panel principal de escritorio con navegación lateral, resumen e indicadores del inventario.
+
+### Mejorado
+- ✅ Interruptor de tema día/noche con transición animada completa antes de aplicar el cambio visual.
+- ✅ Formularios de producto y proveedor con campos guiados, etiquetas claras, búsqueda de productos y estilos adaptados al tema.
+- ✅ Los pagos de escritorio ofrecen Efectivo y Transferencia mediante botones o teclas numéricas 1 y 2.
+- ✅ Se actualizaron la presentación de reportes PDF y la accesibilidad de las interfaces.
+
 ## [1.2.0] - 20 de octubre de 2026
 
 ### Agregado
@@ -100,6 +114,6 @@
 - mejores validaciones de negocio
 - tests automáticos
 
-**Última actualización**: 11 de agosto de 2026
-**Versión actual**: 1.0.3
+**Última actualización**: 23 de octubre de 2026
+**Versión actual**: 1.2.0
 **Estado**: funcional

@@ -1,6 +1,6 @@
 # Sistema de Inventario
 
-Documentación actualizada el 20 de octubre de 2026.
+Documentación actualizada el 23 de octubre de 2026.
 
 ## Resumen del proyecto
 
@@ -12,10 +12,12 @@ Actualmente incluye:
 - control de stock por entradas, salidas y ajustes
 - punto de venta con escaneo rápido por GTIN
 - carrito de compra con modificación de cantidad y descuentos por ítem
-- reportes interactivos avanzados con Streamlit y Plotly (gráficos de barras, líneas, áreas, dona/pastel, treemaps, dispersión y exportación a Excel/CSV)
+- reportes interactivos avanzados con Streamlit y Plotly (gráficos de barras, líneas, áreas, dona/pastel, treemaps, dispersión y exportación a PDF/Excel/CSV)
 - interfaz gráfica con PyQt5 y acceso en un clic a los reportes
+- panel de escritorio con navegación lateral, resumen y accesos rápidos
 - flujo de pago simplificado con selección numérica
 - modo oscuro / claro con memoria y persistencia automática entre sesiones
+- interruptor de tema con transición animada de día a noche
 - **búsqueda avanzada multi-criterio** (nombre, GTIN, laboratorio, descripción)
 - **valorización financiera del inventario** (costo total, venta potencial, margen)
 - **sugerencias automáticas de reabastecimiento** por stock mínimo
@@ -24,6 +26,11 @@ Actualmente incluye:
 - **generador de códigos GTIN-13** con checksum EAN válido
 - **cierre de caja diario** con resumen por cajero y método de pago
 - **API REST ampliada** con nuevas rutas para inventario y caja
+- API de sincronización incremental de solo lectura para preparar clientes móviles
+- validaciones de stock y ventas para evitar cantidades inválidas o inventario negativo
+- mejoras de accesibilidad en web, dashboard y GUI: teclado, foco visible, etiquetas y alternativas tabulares para gráficas
+
+Las mejoras de accesibilidad no representan una certificación formal de conformidad WCAG; se recomienda validar las interfaces con tecnologías de asistencia utilizadas en el entorno de despliegue.
 
 ## Estado actual
 
@@ -34,16 +41,18 @@ Estado: funcional y listo para uso local con GUI, Dashboard Streamlit y API REST
 
 La interfaz gráfica actual incluye varias mejoras orientadas a rapidez y ergonomía:
 
-- pestañas de tamaño grande y distribuidas uniformemente
+- panel de escritorio con navegación lateral y accesos directos
 - tabla de inventario responsive y adaptada al ancho de la ventana
 - botones de acción más grandes para uso táctil
 - búsqueda rápida de productos con lupa
+- catálogo de proveedores con datos de contacto y asignación de productos
+- columna de proveedor en inventario, con indicador cuando no hay uno asignado
+- formularios de producto y proveedor con ayuda contextual y acciones claras
 - agregado directo de artículos al carrito desde el POS
 - flujo de cobro sin pedir nombre de cajero
 - método de pago con selección numérica:
   - 1 = Efectivo
-  - 2 = Tarjeta
-  - 3 = Transferencia
+  - 2 = Transferencia
 - botón de pago, vaciar carrito y eliminar producto con tamaños ampliados
 - interruptor de tema animado (Día / Noche) con guardado automático del último modo usado
 
@@ -88,12 +97,16 @@ pip install -r requirements.txt
 
 ### Interfaz gráfica
 
-Desde la app se presentan estas pestañas principales:
+La ventana principal tiene navegación lateral para estas secciones:
 
-- 📦 Inventario
-- 🛒 POS
+- Inicio: resumen de productos, stock, valor del inventario y alertas
+- 📦 Inventario: catálogo, búsqueda, proveedor, movimientos y acciones rápidas
+- 🛒 Punto de venta: escaneo, carrito y cobro
 - 📊 Reportes (con botón directo para lanzar el Dashboard de Streamlit en el navegador)
+- 🏭 Proveedores: gestión de contactos y asignación de productos
 - 📝 Logs (oculto por defecto y accesible desde reportes o acciones avanzadas)
+
+El catálogo de proveedores permite crear, editar y eliminar contactos, y relacionar varios productos con cada proveedor. La columna **Proveedor** del inventario muestra los nombres asignados o **Sin proveedor**.
 
 ### Flujo de POS
 
@@ -103,15 +116,21 @@ Desde la app se presentan estas pestañas principales:
 - pulsa Pago
 - selecciona el método de pago por número:
   - 1 para Efectivo
-  - 2 para Tarjeta
-  - 3 para Transferencia
+  - 2 para Transferencia
 
 ### Flujo de inventario
 
 - busca productos por texto o GTIN
 - agrega nuevos productos o presentaciones
 - gestiona movimientos de stock
-- revisa en la tabla la información principal del catálogo
+- revisa en la tabla la información del catálogo y sus proveedores
+
+### Flujo de proveedores
+
+- abre **Proveedores** desde la navegación lateral
+- crea un proveedor con su nombre y los datos de contacto disponibles
+- selecciona el proveedor y usa **Asignar productos** para marcar los productos que suministra
+- la tabla de inventario refleja los proveedores asignados; eliminar un proveedor no elimina los productos
 
 ## Configuración
 
@@ -200,5 +219,5 @@ pip install flask
 
 ---
 
-Última actualización: 20 de octubre de 2026
+Última actualización: 23 de octubre de 2026
 Versión: 1.2.0

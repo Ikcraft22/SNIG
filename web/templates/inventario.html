@@ -1,268 +1,265 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventario</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SNIG - Inventario</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/switch.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 2rem;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 10px;
-            padding: 2rem;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-        }
-        
-        h1 {
-            color: #667eea;
-            margin-bottom: 2rem;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 1rem;
-        }
-        
-        .search-box {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-        
-        .search-box input {
-            flex: 1;
-            padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 1rem;
-        }
-        
-        .search-box button {
-            padding: 0.75rem 1.5rem;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        
-        .search-box button:hover {
-            background: #764ba2;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
-        }
-        
-        th, td {
-            padding: 1rem;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-        
-        th {
-            background: #f7f7f7;
-            font-weight: bold;
-            color: #667eea;
-        }
-        
-        tr:hover {
-            background: #f9f9f9;
-        }
-        
-        .btn {
-            display: inline-block;
-            padding: 0.5rem 1rem;
-            background: #667eea;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            cursor: pointer;
-            border: none;
-            transition: background 0.3s;
-        }
-        
-        .btn:hover {
-            background: #764ba2;
-        }
-        
-        .btn-small {
-            padding: 0.25rem 0.75rem;
-            font-size: 0.875rem;
-        }
-        
-        .loading {
-            text-align: center;
-            color: #667eea;
-            font-size: 1.5rem;
-        }
-        
-        .error {
-            background: #fee;
-            color: #c33;
-            padding: 1rem;
-            border-radius: 5px;
-            margin-bottom: 1rem;
-    <link rel="stylesheet" href="/static/css/switch.css">
+        body { background: var(--color-bg); color: var(--color-text); }
+        .inventory-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 0.9fr); gap: 1.5rem; margin-top: 2rem; }
+        .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+        .summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem; margin-top: 1rem; }
+        .mini-stat { background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 0.9rem 1rem; }
+        .mini-stat span { display: block; color: var(--color-text-muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; }
+        .mini-stat strong { display: block; margin-top: 0.35rem; font-size: 1.4rem; color: var(--color-primary); font-variant-numeric: tabular-nums; }
+        .form-stack { display: grid; gap: 0.8rem; margin-top: 1rem; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
+        .muted { color: var(--color-text-muted); }
+        .table-wrap { margin-top: 1rem; overflow-x: auto; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-            <h1 style="margin-bottom: 0; padding-bottom: 0; border-bottom: none;">📦 Gestión de Inventario</h1>
-            <div style="display: flex; align-items: center; gap: 1.5rem;">
-                <label class="switch" for="theme-switch" title="Cambiar modo claro / oscuro">
-                    <input type="checkbox" id="theme-switch" />
-                    <div class="sunmoon">
-                        <div class="darkside"></div>
-                    </div>
-                    <div class="border"></div>
-                    <div class="clouds">
-                        <img src="/static/img/cloud_1.svg" alt="" class="cloud cloud-1" />
-                        <img src="/static/img/cloud_2.svg" alt="" class="cloud cloud-2" />
-                        <img src="/static/img/cloud_3.svg" alt="" class="cloud cloud-3" />
-                        <img src="/static/img/cloud_4.svg" alt="" class="cloud cloud-4" />
-                        <img src="/static/img/stars.svg" alt="" class="stars" />
-                    </div>
-                </label>
-                <button class="btn" onclick="location.href='/'">⬅️ Volver</button>
-            </div>
+    <a class="skip-link" href="#main-content">Saltar al contenido principal</a>
+    <nav aria-label="Navegación principal">
+        <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+            <a href="/">🏠 Inicio</a>
+            <a href="/inventario">📦 Inventario</a>
+            <a href="/pos">🛒 POS</a>
+            <a href="/reportes">📊 Reportes</a>
         </div>
-        
-        <div class="search-box">
-            <input type="text" id="gtin-input" placeholder="Escanea o ingresa GTIN..." autofocus>
-            <button onclick="buscarProducto()">🔍 Buscar</button>
+        <div class="theme-switch-wrapper">
+            <label class="switch" for="theme-switch">
+                <input type="checkbox" id="theme-switch" aria-label="Activar modo oscuro" />
+                <div class="sunmoon"><div class="darkside"></div></div>
+                <div class="border"></div>
+                <div class="clouds">
+                    <img src="{{ url_for('static', filename='img/cloud_1.svg') }}" alt="" class="cloud cloud-1" />
+                    <img src="{{ url_for('static', filename='img/cloud_2.svg') }}" alt="" class="cloud cloud-2" />
+                    <img src="{{ url_for('static', filename='img/cloud_3.svg') }}" alt="" class="cloud cloud-3" />
+                    <img src="{{ url_for('static', filename='img/cloud_4.svg') }}" alt="" class="cloud cloud-4" />
+                    <img src="{{ url_for('static', filename='img/stars.svg') }}" alt="" class="stars" />
+                </div>
+            </label>
         </div>
-        
-        <div id="error-msg" class="error" style="display: none;"></div>
-        <div id="loading" class="loading" style="display: none;">⏳ Cargando...</div>
-        
-        <table id="productos-table">
-            <thead>
-                <tr>
-                    <th>GTIN</th>
-                    <th>Nombre</th>
-                    <th>Laboratorio</th>
-                    <th>Presentación</th>
-                    <th>Stock</th>
-                    <th>Precio</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody id="productos-body">
-                <tr>
-                    <td colspan="7" style="text-align: center; color: #999;">
-                        Ingresa un GTIN para buscar productos
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    
-    <script>
-        function mostrarError(mensaje) {
-            document.getElementById('error-msg').textContent = mensaje;
-            document.getElementById('error-msg').style.display = 'block';
-            setTimeout(() => {
-                document.getElementById('error-msg').style.display = 'none';
-            }, 5000);
-        }
-        
-        function buscarProducto() {
-            const gtin = document.getElementById('gtin-input').value.trim();
-            
-            if (!gtin) {
-                mostrarError('Ingresa un GTIN');
-                return;
-            }
-            
-            document.getElementById('loading').style.display = 'block';
-            
-            fetch(`/api/productos/${gtin}`)
-                .then(response => {
-                    if (response.status === 404) {
-                        throw new Error('Producto no encontrado');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    mostrarProducto(data);
-                })
-                .catch(error => {
-                    mostrarError(error.message);
-                })
-                .finally(() => {
-                    document.getElementById('loading').style.display = 'none';
-                });
-        }
-        
-        function mostrarProducto(producto) {
-            const tbody = document.getElementById('productos-body');
-            tbody.innerHTML = '';
-            
-            producto.presentaciones.forEach(pres => {
-                const fila = `
-                    <tr>
-                        <td>${producto.gtin}</td>
-                        <td>${producto.nombre}</td>
-                        <td>${producto.laboratorio || 'N/A'}</td>
-                        <td>${pres.tipo}</td>
-                        <td>${pres.stock}</td>
-                        <td>$${pres.precio_venta.toFixed(0)}</td>
-                        <td>
-                            <button class="btn btn-small" onclick="registrarEntrada(${pres.id})">Entrada</button>
-                            <button class="btn btn-small" onclick="registrarSalida(${pres.id})">Salida</button>
-                        </td>
-                    </tr>
-                `;
-                tbody.innerHTML += fila;
-            });
-        }
-        
-        function registrarEntrada(presentacionId) {
-            alert('Funcionalidad en desarrollo');
-        }
-        
-        function registrarSalida(presentacionId) {
-            alert('Funcionalidad en desarrollo');
-        }
-        
-        document.getElementById('gtin-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                buscarProducto();
-            }
-        });
+    </nav>
 
+    <main class="container" id="main-content">
+        <div class="panel-head">
+            <h1 style="margin:0;">📦 Gestión de inventario</h1>
+            <button class="btn" type="button" onclick="location.href='/'">⬅️ Volver</button>
+        </div>
+
+        <div class="inventory-layout">
+            <section class="panel" aria-labelledby="inventory-main-title">
+                <div class="panel-head">
+                    <h2 id="inventory-main-title" style="margin:0;">Consulta y búsqueda</h2>
+                    <button class="btn btn-info" type="button" id="btn-cargar-todos">Ver catálogo</button>
+                </div>
+
+                <form id="search-form" class="search-box" role="search">
+                    <label class="visually-hidden" for="gtin-input">Buscar producto por GTIN</label>
+                    <input type="text" id="gtin-input" placeholder="Escanea o escribe GTIN..." autocomplete="off" />
+                    <button type="submit">🔎 Buscar</button>
+                </form>
+
+                <div id="inventory-feedback" class="pos-feedback" role="status" aria-live="polite"></div>
+
+                <div class="table-wrap">
+                    <table aria-label="Productos del inventario">
+                        <thead>
+                            <tr>
+                                <th scope="col">GTIN</th>
+                                <th scope="col">Producto</th>
+                                <th scope="col">Presentación</th>
+                                <th scope="col">Stock</th>
+                                <th scope="col">Precio</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-body">
+                            <tr><td colspan="5" class="muted" style="text-align:center;">Sin resultados aún.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <aside class="panel" aria-labelledby="inventory-summary-title">
+                <h2 id="inventory-summary-title" style="margin-top:0;">Resumen operativo</h2>
+                <div class="summary-grid">
+                    <div class="mini-stat"><span>Productos</span><strong id="summary-productos">0</strong></div>
+                    <div class="mini-stat"><span>Stock</span><strong id="summary-stock">0</strong></div>
+                    <div class="mini-stat"><span>Valor</span><strong id="summary-valor">$0</strong></div>
+                    <div class="mini-stat"><span>Alerta</span><strong id="summary-alerta">0</strong></div>
+                </div>
+
+                <div class="form-stack">
+                    <div>
+                        <label for="selected-product">Producto seleccionado</label>
+                        <input id="selected-product" type="text" value="Ninguno" readonly />
+                    </div>
+                    <div class="form-grid">
+                        <div>
+                            <label for="movimiento-tipo">Movimiento</label>
+                            <select id="movimiento-tipo">
+                                <option value="entrada">Entrada</option>
+                                <option value="salida">Salida</option>
+                                <option value="ajuste">Ajuste</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="movimiento-cantidad">Cantidad</label>
+                            <input id="movimiento-cantidad" type="number" min="1" value="1" />
+                        </div>
+                    </div>
+                    <div>
+                        <label for="movimiento-razon">Razón</label>
+                        <input id="movimiento-razon" type="text" value="Ajuste manual" />
+                    </div>
+                    <button class="btn btn-success" type="button" id="btn-movimiento">Registrar movimiento</button>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+    <script>
         const themeSwitch = document.getElementById('theme-switch');
-        const currentTheme = localStorage.getItem('theme');
-        if (currentTheme === 'dark') {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
             document.body.classList.add('dark');
             if (themeSwitch) themeSwitch.checked = true;
         }
         if (themeSwitch) {
-            themeSwitch.addEventListener('change', function(e) {
-                if (e.target.checked) {
-                    document.body.classList.add('dark');
-                    localStorage.setItem('theme', 'dark');
-                } else {
-                    document.body.classList.remove('dark');
-                    localStorage.setItem('theme', 'light');
-                }
+            themeSwitch.addEventListener('change', function (event) {
+                const isDark = event.target.checked;
+                document.body.classList.toggle('dark', isDark);
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
             });
         }
+
+        let productoSeleccionado = null;
+
+        function setFeedback(message, isError = false) {
+            const el = document.getElementById('inventory-feedback');
+            el.textContent = message;
+            el.style.color = isError ? '#b91c1c' : '#166534';
+        }
+
+        async function cargarResumen() {
+            try {
+                const response = await fetch('/api/inventario/reporte');
+                const data = await response.json();
+                document.getElementById('summary-productos').textContent = data.total_productos ?? 0;
+                document.getElementById('summary-stock').textContent = data.total_stock ?? 0;
+                document.getElementById('summary-valor').textContent = '$' + Number(data.valor_inventario || 0).toLocaleString('es-CO');
+                document.getElementById('summary-alerta').textContent = data.productos_alerta ?? 0;
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        function renderRows(productos) {
+            const tbody = document.getElementById('inventory-body');
+            if (!Array.isArray(productos) || !productos.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center;">No se encontraron productos.</td></tr>';
+                return;
+            }
+
+            const rows = productos.flatMap((producto) => {
+                const presentaciones = Array.isArray(producto.presentaciones) ? producto.presentaciones : [];
+                if (!presentaciones.length) {
+                    return [`<tr><td>${producto.gtin || ''}</td><td>${producto.nombre || 'Sin nombre'}</td><td colspan="3">Sin presentaciones</td></tr>`];
+                }
+                return presentaciones.map((pres) => `
+                    <tr class="inventory-row">
+                        <td>${producto.gtin || ''}</td>
+                        <td>${producto.nombre || ''}</td>
+                        <td>${pres.tipo || 'unidad'}</td>
+                        <td>${pres.stock ?? 0}</td>
+                        <td>$${Number(pres.precio_venta || 0).toLocaleString('es-CO')}</td>
+                    </tr>
+                `);
+            }).join('');
+            tbody.innerHTML = rows;
+        }
+
+        async function cargarCatalogo() {
+            try {
+                const response = await fetch('/api/productos');
+                const data = await response.json();
+                renderRows(Array.isArray(data) ? data : data.items || []);
+                cargarResumen();
+            } catch (error) {
+                setFeedback('No se pudo cargar el catálogo.', true);
+                console.error(error);
+            }
+        }
+
+        async function buscarProducto(event) {
+            event.preventDefault();
+            const gtin = document.getElementById('gtin-input').value.trim();
+            if (!gtin) {
+                setFeedback('Ingresa un GTIN para consultar el producto.', true);
+                return;
+            }
+            try {
+                const response = await fetch(`/api/productos/${gtin}`);
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Producto no encontrado');
+                }
+                const first = data.presentaciones && data.presentaciones[0];
+                productoSeleccionado = {
+                    producto_id: data.id,
+                    presentacion_id: first ? first.id : null,
+                    nombre: data.nombre,
+                    gtin: data.gtin,
+                    precio: first ? first.precio_venta : 0,
+                    stock: first ? first.stock : 0,
+                };
+                document.getElementById('selected-product').value = `${data.nombre} (${data.gtin})`;
+                setFeedback(`Producto encontrado: ${data.nombre}`);
+                renderRows([data]);
+            } catch (error) {
+                setFeedback(error.message || 'Error al buscar el producto.', true);
+            }
+        }
+
+        async function registrarMovimiento() {
+            if (!productoSeleccionado || !productoSeleccionado.producto_id || !productoSeleccionado.presentacion_id) {
+                setFeedback('Selecciona primero un producto para registrar el movimiento.', true);
+                return;
+            }
+            const payload = {
+                producto_id: productoSeleccionado.producto_id,
+                presentacion_id: productoSeleccionado.presentacion_id,
+                tipo: document.getElementById('movimiento-tipo').value,
+                cantidad: Number(document.getElementById('movimiento-cantidad').value || 0),
+                razon: document.getElementById('movimiento-razon').value || 'Ajuste manual',
+                usuario: 'cajero'
+            };
+            try {
+                const response = await fetch('/api/inventario/movimiento', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'No se pudo registrar el movimiento');
+                }
+                setFeedback(`Movimiento ${payload.tipo} registrado correctamente.`);
+                document.getElementById('movimiento-cantidad').value = 1;
+                cargarCatalogo();
+            } catch (error) {
+                setFeedback(error.message || 'Error al registrar el movimiento.', true);
+            }
+        }
+
+        document.getElementById('search-form').addEventListener('submit', buscarProducto);
+        document.getElementById('btn-cargar-todos').addEventListener('click', cargarCatalogo);
+        document.getElementById('btn-movimiento').addEventListener('click', registrarMovimiento);
+        cargarCatalogo();
     </script>
 </body>
 </html>

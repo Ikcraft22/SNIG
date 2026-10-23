@@ -2,6 +2,8 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
+from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import QApplication, QPushButton, QWidget
 
 from core.pos_manager import calcular_vuelto
 from ui import gui_ui
@@ -19,6 +21,7 @@ def test_calcular_vuelto_rechaza_efectivo_insuficiente():
 
 
 def test_pago_efectivo_muestra_vuelto_al_completar_venta(monkeypatch):
+    app = QApplication.instance() or QApplication([])
     total = 275
     venta = SimpleNamespace(numero_ticket="T-100", total=total)
     pos = SimpleNamespace(
@@ -28,16 +31,18 @@ def test_pago_efectivo_muestra_vuelto_al_completar_venta(monkeypatch):
         generar_numero_ticket=Mock(return_value="T-100"),
         crear_venta=Mock(return_value=venta),
     )
-    ventana = SimpleNamespace(
-        pos=pos,
-        actualizar_tabla_carrito=Mock(),
-        actualizar_resumen_carrito=Mock(),
-        ver_todos_productos=Mock(),
-    )
-    monkeypatch.setattr(
-        gui_ui.QInputDialog,
-        "getText",
-        lambda *args: ("1", True),
+    ventana = QWidget()
+    ventana.pos = pos
+    ventana.actualizar_tabla_carrito = Mock()
+    ventana.actualizar_resumen_carrito = Mock()
+    ventana.ver_todos_productos = Mock()
+    QTimer.singleShot(
+        0,
+        lambda: next(
+            button
+            for button in QApplication.activeModalWidget().findChildren(QPushButton)
+            if button.text() == "[1] Efectivo"
+        ).click(),
     )
     entrada_efectivo = {}
 
@@ -64,3 +69,5 @@ def test_pago_efectivo_muestra_vuelto_al_completar_venta(monkeypatch):
     assert entrada_efectivo["argumentos"][3:5] == (total, total)
     assert "Efectivo recibido: $300" in mensajes[0]
     assert "Vuelto: $25" in mensajes[0]
+    ventana.close()
+    app.processEvents()

@@ -1,5 +1,6 @@
 import pytest
 import json
+from uuid import uuid4
 from web.app import app
 
 
@@ -15,6 +16,60 @@ def test_api_productos_get(client):
     assert response.status_code == 200
     data = json.loads(response.data)
     assert isinstance(data, list)
+
+
+def test_api_productos_paginacion_opcional(client):
+    response = client.get("/api/productos?page=1&per_page=1")
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert isinstance(data["items"], list)
+    assert len(data["items"]) <= 1
+    assert data["pagination"]["page"] == 1
+    assert data["pagination"]["per_page"] == 1
+    assert data["pagination"]["total"] >= len(data["items"])
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["page=abc", "page=0", "per_page=0", "per_page=101"],
+)
+def test_api_productos_rechaza_paginacion_invalida(client, query):
+    response = client.get(f"/api/productos?{query}")
+
+    assert response.status_code == 400
+
+
+def test_api_sync_cursor_y_feed_incremental(client):
+    cursor_response = client.get("/api/sync/cursor")
+    assert cursor_response.status_code == 200
+    cursor = cursor_response.get_json()["cursor"]
+
+    create_response = client.post(
+        "/api/productos",
+        json={"gtin": f"sync-{uuid4().hex}", "nombre": "Producto sincronizable"},
+    )
+    assert create_response.status_code == 201
+
+    changes_response = client.get(f"/api/sync/changes?cursor={cursor}&limit=10")
+    assert changes_response.status_code == 200
+    data = changes_response.get_json()
+    assert data["changes"]
+    assert data["changes"][0]["entity_type"] == "productos"
+    assert data["changes"][0]["operation"] == "upsert"
+    assert data["changes"][0]["payload"]["nombre"] == "Producto sincronizable"
+    assert data["changes"][0]["cursor"] > cursor
+    assert data["next_cursor"] >= data["changes"][0]["cursor"]
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["cursor=abc", "cursor=-1", "limit=0", "limit=501"],
+)
+def test_api_sync_rechaza_parametros_invalidos(client, query):
+    response = client.get(f"/api/sync/changes?{query}")
+
+    assert response.status_code == 400
 
 
 def test_api_inventario_resumen_financiero(client):

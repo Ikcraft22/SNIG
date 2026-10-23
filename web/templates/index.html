@@ -1,189 +1,143 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inventario - Inicio</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SNIG - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/switch.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        nav {
-            background-color: rgba(0, 0, 0, 0.8);
-            padding: 1rem;
-            display: flex;
-            gap: 2rem;
-        }
-        
-        nav a {
-            color: white;
-            text-decoration: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            transition: background 0.3s;
-        }
-        
-        nav a:hover {
-            background-color: rgba(255, 255, 255, 0.2);
-        }
-        
-        .container {
-            flex: 1;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            padding: 2rem;
-            max-width: 1400px;
-            margin: 0 auto;
-            width: 100%;
-        }
-        
-        .card {
-            background: white;
-            border-radius: 10px;
-            padding: 2rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-        
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
-        }
-        
-        .card h2 {
-            color: #667eea;
-            margin-bottom: 1rem;
-            font-size: 1.5rem;
-        }
-        
-        .card p {
-            color: #666;
-            line-height: 1.6;
-            margin-bottom: 1.5rem;
-        }
-        
-        .btn {
-            display: inline-block;
-            background: #667eea;
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 5px;
-            text-decoration: none;
-            cursor: pointer;
-            transition: background 0.3s;
-            font-size: 1rem;
-        }
-        
-        .btn:hover {
-            background: #764ba2;
-        }
-        
-        .btn-primary {
-            background: #667eea;
-        }
-        
-        .btn-success {
-            background: #48bb78;
-        }
-        
-        .btn-warning {
-            background: #ed8936;
-        }
-        
-        .btn-info {
-            background: #4299e1;
-        }
-        
-        footer {
-            background-color: rgba(0, 0, 0, 0.8);
-            color: white;
-            text-align: center;
-            padding: 1rem;
-            margin-top: auto;
-        }
-    <link rel="stylesheet" href="/static/css/switch.css">
+        :root { --surface-soft: rgba(255,255,255,0.8); --shadow-soft: 0 16px 36px rgba(15, 23, 42, 0.08); }
+        body { min-height: 100vh; background: var(--color-bg); color: var(--color-text); }
+        .dashboard-shell { display: grid; gap: 1.5rem; margin-top: 2rem; }
+        .hero { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding: 1.5rem 2rem; background: linear-gradient(135deg, rgba(29,78,216,0.08), rgba(96,165,250,0.16)); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+        .hero-title { font-size: clamp(1.8rem, 2.5vw, 2.4rem); margin: 0; color: var(--color-primary); }
+        .hero-subtitle { color: var(--color-text-muted); margin-top: 0.35rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+        .stat-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem 1.25rem; box-shadow: var(--shadow-sm); }
+        .stat-label { display: block; font-size: 0.75rem; color: var(--color-text-muted); letter-spacing: 0.08em; text-transform: uppercase; }
+        .stat-value { display: block; margin-top: 0.5rem; font-size: 1.7rem; font-weight: 800; color: var(--color-primary); font-variant-numeric: tabular-nums; }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem; }
+        .card { display: flex; flex-direction: column; justify-content: space-between; min-height: 220px; }
+        .card-badge { display: inline-flex; align-items: center; gap: 0.5rem; width: fit-content; padding: 0.35rem 0.7rem; border-radius: 999px; background: var(--color-primary-soft); color: var(--color-primary-hover); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+        .card h2 { margin-top: 1rem; margin-bottom: 0.8rem; }
+        .card p { margin-bottom: 1.25rem; }
+    </style>
 </head>
 <body>
-    <nav>
-        <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+    <a class="skip-link" href="#main-content">Saltar al contenido principal</a>
+    <nav aria-label="Navegación principal">
+        <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
             <a href="/">🏠 Inicio</a>
             <a href="/inventario">📦 Inventario</a>
             <a href="/pos">🛒 POS</a>
             <a href="/reportes">📊 Reportes</a>
         </div>
         <div class="theme-switch-wrapper">
-            <label class="switch" for="theme-switch" title="Cambiar modo claro / oscuro">
-                <input type="checkbox" id="theme-switch" />
-                <div class="sunmoon">
-                    <div class="darkside"></div>
-                </div>
+            <label class="switch" for="theme-switch">
+                <input type="checkbox" id="theme-switch" aria-label="Activar modo oscuro" />
+                <div class="sunmoon"><div class="darkside"></div></div>
                 <div class="border"></div>
                 <div class="clouds">
-                    <img src="/static/img/cloud_1.svg" alt="" class="cloud cloud-1" />
-                    <img src="/static/img/cloud_2.svg" alt="" class="cloud cloud-2" />
-                    <img src="/static/img/cloud_3.svg" alt="" class="cloud cloud-3" />
-                    <img src="/static/img/cloud_4.svg" alt="" class="cloud cloud-4" />
-                    <img src="/static/img/stars.svg" alt="" class="stars" />
+                    <img src="{{ url_for('static', filename='img/cloud_1.svg') }}" alt="" class="cloud cloud-1" />
+                    <img src="{{ url_for('static', filename='img/cloud_2.svg') }}" alt="" class="cloud cloud-2" />
+                    <img src="{{ url_for('static', filename='img/cloud_3.svg') }}" alt="" class="cloud cloud-3" />
+                    <img src="{{ url_for('static', filename='img/cloud_4.svg') }}" alt="" class="cloud cloud-4" />
+                    <img src="{{ url_for('static', filename='img/stars.svg') }}" alt="" class="stars" />
                 </div>
             </label>
         </div>
     </nav>
-    
-    <div class="container">
-        <div class="card">
-            <h2>📦 Inventario</h2>
-            <p>Gestiona el inventario general, consulta stock y realiza movimientos de entrada/salida.</p>
-            <a href="/inventario" class="btn btn-primary">Ir a Inventario</a>
+
+    <main class="container dashboard-shell" id="main-content">
+        <section class="hero" aria-labelledby="dashboard-title">
+            <div>
+                <p class="card-badge">SNIG • Sistema de gestión</p>
+                <h1 id="dashboard-title" class="hero-title">Panel principal</h1>
+                <p class="hero-subtitle">Control operativo del inventario, ventas y caja en tiempo real.</p>
+            </div>
+            <a class="btn btn-primary" href="/pos">Abrir POS</a>
+        </section>
+
+        <div class="stats-grid" aria-live="polite">
+            <article class="stat-card"><span class="stat-label">Productos</span><span class="stat-value" id="stat-productos">0</span></article>
+            <article class="stat-card"><span class="stat-label">Stock total</span><span class="stat-value" id="stat-stock">0</span></article>
+            <article class="stat-card"><span class="stat-label">Valor inventario</span><span class="stat-value" id="stat-valor">$0</span></article>
+            <article class="stat-card"><span class="stat-label">Productos con alerta</span><span class="stat-value" id="stat-alerta">0</span></article>
         </div>
-        
-        <div class="card">
-            <h2>🛒 Punto de Venta</h2>
-            <p>Procesa ventas, crea tickets y gestiona el carrito de compra con facilidad.</p>
-            <a href="/pos" class="btn btn-success">Ir a POS</a>
+
+        <div class="dashboard-grid">
+            <section class="card" aria-labelledby="inventory-card-title">
+                <div>
+                    <span class="card-badge">Inventario</span>
+                    <h2 id="inventory-card-title">Gestión y stock</h2>
+                    <p>Consulta productos, registra entradas, salidas y ajusta existencias con un sistema de control claro y rápido.</p>
+                </div>
+                <a href="/inventario" class="btn btn-primary">Ir al inventario</a>
+            </section>
+
+            <section class="card" aria-labelledby="pos-card-title">
+                <div>
+                    <span class="card-badge">Punto de venta</span>
+                    <h2 id="pos-card-title">Cobranza y caja</h2>
+                    <p>Atiende ventas, agrega productos al carrito y procesa pagos con una interfaz optimizada para cajeros.</p>
+                </div>
+                <a href="/pos" class="btn btn-success">Abrir POS</a>
+            </section>
+
+            <section class="card" aria-labelledby="reports-card-title">
+                <div>
+                    <span class="card-badge">Reportes</span>
+                    <h2 id="reports-card-title">Análisis y tendencias</h2>
+                    <p>Evalúa ventas, inventario bajo, movimientos y el comportamiento del negocio desde un panel.</p>
+                </div>
+                <a href="/reportes" class="btn btn-info">Ver reportes</a>
+            </section>
+
+            <section class="card" aria-labelledby="sync-card-title">
+                <div>
+                    <span class="card-badge">Operación</span>
+                    <h2 id="sync-card-title">Estado del turno</h2>
+                    <p>La caja, el inventario y los reportes están conectados al mismo sistema para mantener la operación centralizada.</p>
+                </div>
+                <a href="/reportes" class="btn btn-secondary">Revisar turno</a>
+            </section>
         </div>
-        
-        <div class="card">
-            <h2>📊 Reportes</h2>
-            <p>Visualiza reportes de inventario, ventas y análisis en tiempo real.</p>
-            <a href="/reportes" class="btn btn-info">Ver Reportes</a>
-        </div>
-    </div>
-    
+    </main>
+
     <footer>
         <p>&copy; 2025 Sistema de Inventario General | Versión 1.0</p>
     </footer>
 
     <script>
         const themeSwitch = document.getElementById('theme-switch');
-        const currentTheme = localStorage.getItem('theme');
-        if (currentTheme === 'dark') {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
             document.body.classList.add('dark');
             if (themeSwitch) themeSwitch.checked = true;
         }
         if (themeSwitch) {
-            themeSwitch.addEventListener('change', function(e) {
-                if (e.target.checked) {
-                    document.body.classList.add('dark');
-                    localStorage.setItem('theme', 'dark');
-                } else {
-                    document.body.classList.remove('dark');
-                    localStorage.setItem('theme', 'light');
-                }
+            themeSwitch.addEventListener('change', function (event) {
+                const isDark = event.target.checked;
+                document.body.classList.toggle('dark', isDark);
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
             });
         }
+
+        async function cargarResumenDashboard() {
+            try {
+                const response = await fetch('/api/inventario/reporte');
+                const data = await response.json();
+                document.getElementById('stat-productos').textContent = data.total_productos ?? 0;
+                document.getElementById('stat-stock').textContent = data.total_stock ?? 0;
+                document.getElementById('stat-valor').textContent = '$' + Number(data.valor_inventario || 0).toLocaleString('es-CO');
+                document.getElementById('stat-alerta').textContent = data.productos_alerta ?? 0;
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        cargarResumenDashboard();
     </script>
 </body>
 </html>

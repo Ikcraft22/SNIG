@@ -2,17 +2,24 @@
 
 ## ¿Cómo inicio el proyecto?
 
-Ejecuta:
+Para abrir el programa de escritorio ejecuta:
 
 ```bash
 python main.py
 ```
 
-Luego elige una de las opciones del menú:
+La interfaz gráfica se abre directamente. Para iniciar otros componentes:
 
-- 1 para terminal
-- 2 para GUI
-- 3 para web
+- Dashboard:
+  ```bash
+  python main.py --reportes
+  ```
+- Aplicación web:
+  ```bash
+  python -m web.app
+  ```
+
+La interfaz de terminal sigue disponible mediante el módulo `ui.terminal_ui`.
 
 ## ¿Qué base de datos usa por defecto?
 
@@ -49,7 +56,11 @@ pip install PyQt5
 
 ## ¿Cómo funciona el POS?
 
-En la pestaña POS puedes escribir o escanear un GTIN y presionar Enter para agregar el producto directamente al carrito. Si se repite el mismo producto 10 veces seguidas, el sistema muestra una alerta de compra masiva.
+En la sección **Punto de venta** puedes escribir o escanear un GTIN y presionar Enter para agregar el producto directamente al carrito. Se puede pagar en Efectivo o por Transferencia; los botones también aceptan las teclas `1` y `2`. Si se repite el mismo producto 10 veces seguidas, el sistema muestra una alerta de compra masiva.
+
+## ¿Cómo registro un proveedor y le asigno productos?
+
+Abre **Proveedores** desde la navegación lateral, pulsa **Nuevo proveedor** y completa el nombre y los datos de contacto disponibles. Después selecciona al proveedor, elige **Asignar productos**, busca por nombre o GTIN y marca los productos que suministra. La columna **Proveedor** del inventario muestra las asignaciones. Eliminar al proveedor no elimina los productos.
 
 ## ¿La interfaz está preparada para pantallas táctiles?
 
@@ -105,7 +116,7 @@ Sí. En la pestaña **📥 Centro de Exportación** de Streamlit puedes descarga
 
 ## ¿Cómo recuerda el sistema si estaba en modo oscuro o claro?
 
-La aplicación guarda automáticamente la preferencia en el archivo local `.startup_state.json` cada vez que accionas el interruptor de tema Día / Noche, recuperando el mismo modo al volver a abrir el programa.
+La aplicación guarda automáticamente la preferencia en el archivo local `.startup_state.json` cada vez que accionas el interruptor animado de tema Día / Noche, recuperando el mismo modo al volver a abrir el programa.
 
 ## ¿Dónde está la lógica principal?
 
@@ -116,4 +127,4 @@ La aplicación guarda automáticamente la preferencia en el archivo local `.star
 - `web/app.py`: rutas y API web con Flask
 - `database/models.py`: modelos de datos SQLAlchemy
 
-**Última actualización**: 4 de septiembre de 2026
+**Última actualización**: 23 de octubre de 2026

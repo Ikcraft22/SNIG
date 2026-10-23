@@ -1,354 +1,327 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Punto de Venta</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SNIG - POS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/switch.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-            min-height: 100vh;
-            padding: 2rem;
-        }
-        
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-        }
-        
-        .panel {
-            background: white;
-            border-radius: 10px;
-            padding: 2rem;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-        }
-        
-        h1 {
-            color: #38a169;
-            margin-bottom: 1.5rem;
-            border-bottom: 2px solid #38a169;
-            padding-bottom: 1rem;
-        }
-        
-        .search-box {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-        
-        .search-box input {
-            flex: 1;
-            padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 1rem;
-        }
-        
-        .search-box button {
-            padding: 0.75rem 1.5rem;
-            background: #38a169;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        th, td {
-            padding: 1rem;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-        
-        th {
-            background: #f7f7f7;
-            font-weight: bold;
-            color: #38a169;
-        }
-        
-        .resumen {
-            background: #f9f9f9;
-            padding: 1.5rem;
-            border-radius: 5px;
-            margin: 1rem 0;
-        }
-        
-        .resumen-fila {
-            display: flex;
-            justify-content: space-between;
-            padding: 0.5rem 0;
-            font-size: 1.1rem;
-        }
-        
-        .resumen-total {
-            font-weight: bold;
-            font-size: 1.5rem;
-            color: #38a169;
-            border-top: 2px solid #38a169;
-            margin-top: 1rem;
-            padding-top: 1rem;
-        }
-        
-        .btn {
-            display: inline-block;
-            padding: 0.75rem 1.5rem;
-            background: #38a169;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            cursor: pointer;
-            border: none;
-            transition: background 0.3s;
-            margin: 0.5rem;
-        }
-        
-        .btn:hover {
-            background: #2f855a;
-        }
-        
-        .btn-danger {
-            background: #f56565;
-        }
-        
-        .btn-danger:hover {
-            background: #e53e3e;
-        }
-        
-        .btn-primary {
-            background: #48bb78;
-        }
-        
-        .btn-primary:hover {
-            background: #38a169;
-        }
-        
-        .empty-cart {
-            text-align: center;
-            color: #999;
-            padding: 2rem;
-        }
-    <link rel="stylesheet" href="/static/css/switch.css">
+        body { background: var(--color-bg); color: var(--color-text); }
+        .pos-shell { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 0.9fr); gap: 1.5rem; margin-top: 2rem; }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; }
+        .product-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 0.9rem; display: flex; flex-direction: column; gap: 0.75rem; box-shadow: var(--shadow-sm); }
+        .product-cover { display: flex; align-items: center; justify-content: center; min-height: 120px; border-radius: var(--radius-md); background: linear-gradient(135deg, rgba(29,78,216,0.12), rgba(34,197,94,0.12)); font-size: 2.5rem; font-weight: 700; }
+        .product-meta { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+        .stock-badge { background: var(--color-success-soft); color: var(--color-success); border-radius: 999px; padding: 0.2rem 0.5rem; font-size: 0.7rem; font-weight: 700; }
+        .cart-items { display: grid; gap: 0.8rem; margin-top: 1rem; }
+        .cart-item { display: flex; justify-content: space-between; gap: 0.75rem; align-items: center; padding: 0.75rem; border: 1px solid var(--color-border); background: var(--color-surface-alt); border-radius: var(--radius-md); }
+        .mini-controls { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.3rem; }
+        .mini-controls button { width: 28px; height: 28px; min-height: 28px; padding: 0; }
+        .payment-methods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.7rem; margin-top: 1rem; }
+        .payment-method { border: 1px solid var(--color-border); background: var(--color-surface-alt); border-radius: var(--radius-md); padding: 0.7rem 0.5rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease; }
+        .payment-method.active { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-primary-hover); }
+        .totals { display: grid; gap: 0.5rem; margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--color-border); }
+        .totals-row { display: flex; justify-content: space-between; font-weight: 600; }
+        .total-final { font-size: 1.7rem; font-weight: 800; color: var(--color-primary); font-variant-numeric: tabular-nums; }
+    </style>
 </head>
 <body>
-    <div style="max-width: 1400px; margin: 0 auto 1.5rem auto; display: flex; justify-content: flex-end; align-items: center; gap: 1.5rem;">
-        <label class="switch" for="theme-switch" title="Cambiar modo claro / oscuro">
-            <input type="checkbox" id="theme-switch" />
-            <div class="sunmoon">
-                <div class="darkside"></div>
-            </div>
-            <div class="border"></div>
-            <div class="clouds">
-                <img src="/static/img/cloud_1.svg" alt="" class="cloud cloud-1" />
-                <img src="/static/img/cloud_2.svg" alt="" class="cloud cloud-2" />
-                <img src="/static/img/cloud_3.svg" alt="" class="cloud cloud-3" />
-                <img src="/static/img/cloud_4.svg" alt="" class="cloud cloud-4" />
-                <img src="/static/img/stars.svg" alt="" class="stars" />
-            </div>
-        </label>
-        <button class="btn" style="margin: 0;" onclick="location.href='/'">⬅️ Volver al Inicio</button>
-    </div>
-    <div class="container">
-        <!-- Panel Izquierdo: Búsqueda de Productos -->
-        <div class="panel">
-            <h1>🛍️ Agregar Productos</h1>
-            
-            <div class="search-box">
-                <input type="text" id="gtin-input" placeholder="Escanea GTIN..." autofocus>
-                <button onclick="agregarCarrito()">➕ Agregar</button>
-            </div>
-            
-            <div id="producto-info" style="display: none; background: #f0f0f0; padding: 1rem; border-radius: 5px; margin-bottom: 1rem;">
-                <p><strong>Nombre:</strong> <span id="producto-nombre"></span></p>
-                <p><strong>Presentación:</strong> <span id="producto-presentacion"></span></p>
-                <p><strong>Precio:</strong> <span id="producto-precio"></span></p>
-                <p><strong>Stock:</strong> <span id="producto-stock"></span></p>
-            </div>
-            
-            <div style="margin-bottom: 1rem;">
-                <label>Cantidad: </label>
-                <input type="number" id="cantidad-input" value="1" min="1">
-            </div>
-            
-            <button class="btn btn-primary" onclick="agregarCarrito()">➕ Agregar al Carrito</button>
+    <a class="skip-link" href="#main-content">Saltar al contenido principal</a>
+    <nav aria-label="Navegación principal">
+        <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+            <a href="/">🏠 Inicio</a>
+            <a href="/inventario">📦 Inventario</a>
+            <a href="/pos">🛒 POS</a>
+            <a href="/reportes">📊 Reportes</a>
         </div>
-        
-        <!-- Panel Derecho: Carrito -->
-        <div class="panel">
-            <h1>🛒 Carrito</h1>
-            
-            <table id="carrito-table" style="display: none;">
-                <thead>
-                    <tr>
-                        <th>Producto</th>
-                        <th>Cantidad</th>
-                        <th>Precio</th>
-                        <th>Subtotal</th>
-                        <th>Acción</th>
-                    </tr>
-                </thead>
-                <tbody id="carrito-body">
-                </tbody>
-            </table>
-            
-            <div id="carrito-vacio" class="empty-cart">
-                🛒 Carrito vacío
-            </div>
-            
-            <div class="resumen">
-                <div class="resumen-fila">
-                    <span>Subtotal:</span>
-                    <span id="subtotal">$0</span>
+        <div class="theme-switch-wrapper">
+            <label class="switch" for="theme-switch">
+                <input type="checkbox" id="theme-switch" aria-label="Activar modo oscuro" />
+                <div class="sunmoon"><div class="darkside"></div></div>
+                <div class="border"></div>
+                <div class="clouds">
+                    <img src="{{ url_for('static', filename='img/cloud_1.svg') }}" alt="" class="cloud cloud-1" />
+                    <img src="{{ url_for('static', filename='img/cloud_2.svg') }}" alt="" class="cloud cloud-2" />
+                    <img src="{{ url_for('static', filename='img/cloud_3.svg') }}" alt="" class="cloud cloud-3" />
+                    <img src="{{ url_for('static', filename='img/cloud_4.svg') }}" alt="" class="cloud cloud-4" />
+                    <img src="{{ url_for('static', filename='img/stars.svg') }}" alt="" class="stars" />
                 </div>
-                <div class="resumen-total">
-                    <span>Total:</span>
-                    <span id="total">$0</span>
-                </div>
-            </div>
-            
-            <button class="btn btn-danger" onclick="vaciarCarrito()" id="btn-vaciar">🗑️ Vaciar Carrito</button>
-            <button class="btn btn-primary" onclick="procesarPago()" id="btn-pagar" style="width: calc(100% - 10rem);">💳 Procesar Pago</button>
+            </label>
         </div>
-    </div>
-    
-    <script>
-        let carrito = [];
-        
-        function buscarProducto() {
-            const gtin = document.getElementById('gtin-input').value.trim();
-            
-            if (!gtin) return;
-            
-            fetch(`/api/productos/${gtin}`)
-                .then(response => response.json())
-                .then(producto => {
-                    if (producto.presentaciones && producto.presentaciones.length > 0) {
-                        const pres = producto.presentaciones[0];
-                        document.getElementById('producto-nombre').textContent = producto.nombre;
-                        document.getElementById('producto-presentacion').textContent = pres.tipo;
-                        document.getElementById('producto-precio').textContent = `$${pres.precio_venta.toFixed(0)}`;
-                        document.getElementById('producto-stock').textContent = pres.stock;
-                        document.getElementById('producto-info').style.display = 'block';
-                    }
-                })
-                .catch(error => alert('Error: ' + error.message));
-        }
-        
-        function agregarCarrito() {
-            const gtin = document.getElementById('gtin-input').value.trim();
-            const cantidad = parseInt(document.getElementById('cantidad-input').value) || 1;
-            
-            if (!gtin) {
-                alert('Ingresa un GTIN');
-                return;
-            }
-            
-            fetch(`/api/productos/${gtin}`)
-                .then(response => response.json())
-                .then(producto => {
-                    if (producto.presentaciones && producto.presentaciones.length > 0) {
-                        const pres = producto.presentaciones[0];
-                        const precio = Math.round(pres.precio_venta);
-                        carrito.push({
-                            producto: producto.nombre,
-                            presentacion: pres.tipo,
-                            cantidad: cantidad,
-                            precio: precio,
-                            subtotal: cantidad * precio
-                        });
-                        
-                        actualizarCarrito();
-                        document.getElementById('gtin-input').value = '';
-                        document.getElementById('cantidad-input').value = '1';
-                        document.getElementById('producto-info').style.display = 'none';
-                    }
-                })
-                .catch(error => alert('Error: ' + error.message));
-        }
-        
-        function actualizarCarrito() {
-            const tbody = document.getElementById('carrito-body');
-            tbody.innerHTML = '';
-            
-            let subtotal = 0;
-            
-            carrito.forEach((item, index) => {
-                subtotal += item.subtotal;
-                const fila = `
-                    <tr>
-                        <td>${item.producto}</td>
-                        <td>${item.cantidad}</td>
-                        <td>$${item.precio.toFixed(0)}</td>
-                        <td>$${item.subtotal.toFixed(0)}</td>
-                        <td><button class="btn btn-danger" onclick="eliminarDelCarrito(${index})">🗑️</button></td>
-                    </tr>
-                `;
-                tbody.innerHTML += fila;
-            });
-            
-            const total = subtotal;
-            
-            document.getElementById('carrito-table').style.display = carrito.length > 0 ? 'table' : 'none';
-            document.getElementById('carrito-vacio').style.display = carrito.length > 0 ? 'none' : 'block';
-            document.getElementById('subtotal').textContent = `$${subtotal.toFixed(0)}`;
-            document.getElementById('total').textContent = `$${total.toFixed(0)}`;
-            document.getElementById('btn-vaciar').disabled = carrito.length === 0;
-            document.getElementById('btn-pagar').disabled = carrito.length === 0;
-        }
-        
-        function eliminarDelCarrito(index) {
-            carrito.splice(index, 1);
-            actualizarCarrito();
-        }
-        
-        function vaciarCarrito() {
-            carrito = [];
-            actualizarCarrito();
-        }
-        
-        function procesarPago() {
-            alert('Funcionalidad de pago en desarrollo');
-        }
-        
-        document.getElementById('gtin-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                buscarProducto();
-            }
-        });
-        
-        // Inicializar carrito
-        actualizarCarrito();
+    </nav>
 
+    <main class="container pos-shell" id="main-content">
+        <section class="panel" aria-labelledby="pos-catalog-title">
+            <div class="panel-head">
+                <h1 id="pos-catalog-title" style="margin:0;">🛒 Punto de venta</h1>
+                <button class="btn" type="button" onclick="location.href='/'">⬅️ Inicio</button>
+            </div>
+
+            <div class="search-box" role="search">
+                <label class="visually-hidden" for="catalog-search">Buscar producto</label>
+                <input id="catalog-search" type="text" placeholder="Busca por nombre o GTIN..." />
+                <button type="button" id="btn-buscar-producto">Buscar</button>
+            </div>
+
+            <div id="pos-feedback" class="pos-feedback" role="status" aria-live="polite"></div>
+            <div id="product-grid" class="product-grid"></div>
+        </section>
+
+        <aside class="panel" aria-labelledby="cart-title">
+            <div class="panel-head">
+                <h2 id="cart-title" style="margin:0;">Carrito</h2>
+                <button class="btn btn-danger" type="button" id="btn-vaciar">Vaciar</button>
+            </div>
+
+            <div id="cart-items" class="cart-items" aria-live="polite"></div>
+
+            <div class="payment-methods" aria-label="Métodos de pago">
+                <button class="payment-method active" type="button" data-method="efectivo">Efectivo</button>
+                <button class="payment-method" type="button" data-method="transferencia">Transferencia</button>
+            </div>
+
+            <div class="totals">
+                <div class="totals-row"><span>Subtotal</span><span id="subtotal">$0</span></div>
+                <div class="totals-row"><span>Descuento</span><span id="descuento">$0</span></div>
+                <div class="totals-row total-final"><span>Total</span><span id="total">$0</span></div>
+            </div>
+
+            <button class="btn btn-success" type="button" id="btn-checkout" style="width:100%; margin-top:1rem;">💳 Procesar venta</button>
+        </aside>
+    </main>
+
+    <script>
         const themeSwitch = document.getElementById('theme-switch');
-        const currentTheme = localStorage.getItem('theme');
-        if (currentTheme === 'dark') {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
             document.body.classList.add('dark');
             if (themeSwitch) themeSwitch.checked = true;
         }
         if (themeSwitch) {
-            themeSwitch.addEventListener('change', function(e) {
-                if (e.target.checked) {
-                    document.body.classList.add('dark');
-                    localStorage.setItem('theme', 'dark');
-                } else {
-                    document.body.classList.remove('dark');
-                    localStorage.setItem('theme', 'light');
-                }
+            themeSwitch.addEventListener('change', function (event) {
+                const isDark = event.target.checked;
+                document.body.classList.toggle('dark', isDark);
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
             });
         }
+
+        let carrito = [];
+        let metodoPago = 'efectivo';
+
+        function setFeedback(message, isError = false) {
+            const el = document.getElementById('pos-feedback');
+            el.textContent = message;
+            el.style.color = isError ? '#b91c1c' : '#166534';
+        }
+
+        function formatCurrency(value) {
+            return '$' + Number(value || 0).toLocaleString('es-CO');
+        }
+
+        function renderCart() {
+            const cart = document.getElementById('cart-items');
+            if (!carrito.length) {
+                cart.innerHTML = '<div class="empty-cart">Carrito vacío</div>';
+                document.getElementById('subtotal').textContent = '$0';
+                document.getElementById('descuento').textContent = '$0';
+                document.getElementById('total').textContent = '$0';
+                return;
+            }
+
+            const subtotal = carrito.reduce((sum, item) => sum + (item.cantidad * item.precio_venta), 0);
+            const descuento = carrito.reduce((sum, item) => sum + (item.cantidad * item.precio_venta * (item.descuento || 0) / 100), 0);
+            const total = subtotal - descuento;
+
+            cart.innerHTML = carrito.map((item) => `
+                <div class="cart-item">
+                    <div>
+                        <strong>${item.nombre}</strong><br>
+                        <small>${item.presentacion}</small>
+                        <div class="mini-controls">
+                            <button type="button" data-action="decrease" data-id="${item.presentacion_id}">−</button>
+                            <span>${item.cantidad}</span>
+                            <button type="button" data-action="increase" data-id="${item.presentacion_id}">+</button>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div>${formatCurrency(item.cantidad * item.precio_venta)}</div>
+                        <button type="button" class="btn btn-danger" data-action="remove" data-id="${item.presentacion_id}" style="margin-top:.4rem;">Quitar</button>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('subtotal').textContent = formatCurrency(subtotal);
+            document.getElementById('descuento').textContent = formatCurrency(descuento);
+            document.getElementById('total').textContent = formatCurrency(total);
+        }
+
+        function addCartItem(item) {
+            const existing = carrito.find((x) => x.presentacion_id === item.presentacion_id);
+            if (existing) {
+                existing.cantidad += 1;
+            } else {
+                carrito.push({ ...item, cantidad: 1, descuento: 0 });
+            }
+            renderCart();
+            setFeedback(`${item.nombre} agregado al carrito.`);
+        }
+
+        function changeCartQuantity(id, delta) {
+            const item = carrito.find((x) => x.presentacion_id === id);
+            if (!item) return;
+            item.cantidad += delta;
+            if (item.cantidad <= 0) {
+                carrito = carrito.filter((x) => x.presentacion_id !== id);
+            }
+            renderCart();
+        }
+
+        async function cargarProductos() {
+            const query = document.getElementById('catalog-search').value.trim().toLowerCase();
+            try {
+                const response = await fetch('/api/productos');
+                const data = await response.json();
+                const productos = Array.isArray(data) ? data : (data.items || []);
+                const filtrados = productos.filter((producto) => {
+                    if (!query) return true;
+                    const hayGtIn = (producto.gtin || '').toLowerCase().includes(query);
+                    const hayNombre = (producto.nombre || '').toLowerCase().includes(query);
+                    const hayLaboratorio = (producto.laboratorio || '').toLowerCase().includes(query);
+                    return hayGtIn || hayNombre || hayLaboratorio;
+                });
+
+                const grid = document.getElementById('product-grid');
+                if (!filtrados.length) {
+                    grid.innerHTML = '<div class="empty-cart">No hay productos para mostrar.</div>';
+                    return;
+                }
+
+                grid.innerHTML = filtrados.map((producto) => {
+                    const first = producto.presentaciones && producto.presentaciones[0] ? producto.presentaciones[0] : null;
+                    const precio = first ? Number(first.precio_venta || 0) : 0;
+                    const stock = first ? Number(first.stock || 0) : 0;
+                    const icon = ['🥤', '🍎', '🥪', '🥛', '🧃', '🍇'][Math.abs((producto.gtin || '').length) % 6];
+                    const prodData = JSON.stringify({
+                        id: producto.id,
+                        nombre: producto.nombre,
+                        gtin: producto.gtin,
+                        presentacion_id: first ? first.id : null,
+                        presentacion: first ? first.tipo : 'unidad',
+                        precio_venta: precio,
+                        stock: stock,
+                    }).replace(/'/g, '&apos;');
+                    return `
+                        <article class="product-card">
+                            <div class="product-cover">${icon}</div>
+                            <div>
+                                <div class="product-meta">
+                                    <strong>${producto.nombre || 'Producto'}</strong>
+                                    <span class="stock-badge">${stock} un.</span>
+                                </div>
+                                <p class="muted" style="margin:0.4rem 0 0;">${producto.gtin || ''}</p>
+                                <p class="muted" style="margin:0.3rem 0 0;">${first ? first.tipo : 'unidad'}</p>
+                            </div>
+                            <div class="product-meta">
+                                <strong>${formatCurrency(precio)}</strong>
+                                <button class="btn btn-primary" type="button" data-product='${prodData}'>Agregar</button>
+                            </div>
+                        </article>
+                    `;
+                }).join('');
+
+                grid.querySelectorAll('button[data-product]').forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const product = JSON.parse(button.getAttribute('data-product').replace(/&apos;/g, "'"));
+                        if (!product.presentacion_id) {
+                            setFeedback('Este producto no tiene presentación disponible.', true);
+                            return;
+                        }
+                        addCartItem({
+                            producto_id: product.id,
+                            presentacion_id: product.presentacion_id,
+                            nombre: product.nombre,
+                            presentacion: product.presentacion,
+                            precio_venta: product.precio_venta,
+                            stock: product.stock,
+                            descuento: 0,
+                        });
+                    });
+                });
+            } catch (error) {
+                console.error(error);
+                setFeedback('No se pudo cargar la lista de productos.', true);
+            }
+        }
+
+        document.getElementById('btn-buscar-producto').addEventListener('click', cargarProductos);
+        document.getElementById('catalog-search').addEventListener('input', () => {
+            if (!document.getElementById('catalog-search').value.trim()) {
+                cargarProductos();
+            }
+        });
+
+        document.getElementById('btn-vaciar').addEventListener('click', () => {
+            carrito = [];
+            renderCart();
+            setFeedback('Carrito vaciado.');
+        });
+
+        document.getElementById('cart-items').addEventListener('click', (event) => {
+            const button = event.target.closest('button');
+            if (!button) return;
+            const action = button.dataset.action;
+            const id = Number(button.dataset.id);
+            if (action === 'increase') changeCartQuantity(id, 1);
+            if (action === 'decrease') changeCartQuantity(id, -1);
+            if (action === 'remove') changeCartQuantity(id, -999);
+        });
+
+        document.querySelectorAll('.payment-method').forEach((button) => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('.payment-method').forEach((el) => el.classList.remove('active'));
+                button.classList.add('active');
+                metodoPago = button.dataset.method;
+            });
+        });
+
+        document.getElementById('btn-checkout').addEventListener('click', async () => {
+            if (!carrito.length) {
+                setFeedback('El carrito está vacío.', true);
+                return;
+            }
+            try {
+                const response = await fetch('/api/ventas/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        metodo_pago: metodoPago,
+                        usuario: 'cajero',
+                        items: carrito.map((item) => ({
+                            producto_id: item.producto_id,
+                            presentacion_id: item.presentacion_id,
+                            cantidad: item.cantidad,
+                            precio_unitario: item.precio_venta,
+                            descuento: item.descuento || 0,
+                            producto_nombre: item.nombre,
+                            presentacion_nombre: item.presentacion,
+                        }))
+                    })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'No se pudo procesar la venta');
+                }
+                setFeedback(`Venta registrada: ${data.ticket} · ${formatCurrency(data.total)}`);
+                carrito = [];
+                renderCart();
+            } catch (error) {
+                setFeedback(error.message || 'Error al procesar la venta.', true);
+            }
+        });
+
+        renderCart();
+        cargarProductos();
     </script>
 </body>
 </html>

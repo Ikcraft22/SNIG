@@ -22,6 +22,7 @@ class SwitchDiaNoche(QWidget):
     - Modo Oscuro: Luna creciente (#DEE5F3 con recorte oscuro #565C6B) y cielo estrellado.
     """
     toggled = pyqtSignal(bool)
+    animationFinished = pyqtSignal(bool)
 
     def __init__(self, parent=None, checked=False, width=120, height=52):
         super().__init__(parent)
@@ -37,12 +38,17 @@ class SwitchDiaNoche(QWidget):
         self.setCursor(QCursor(Qt.PointingHandCursor))
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.setFocusPolicy(Qt.StrongFocus)
+        self.setAccessibleName("Cambiar tema de color")
+        self.setAccessibleDescription(
+            "Alterna entre modo claro y modo oscuro. Usa Espacio o Intro para cambiar."
+        )
         self.actualizar_tooltip()
 
         # Animación suave de transición
         self._anim = QPropertyAnimation(self, b"progreso", self)
         self._anim.setDuration(500)
         self._anim.setEasingCurve(QEasingCurve.InOutCubic)
+        self._anim.finished.connect(self._notificar_animacion_finalizada)
 
         # Cargar recursos SVG
         self._assets_dir = Path(__file__).resolve().parent / "assets"
@@ -61,8 +67,14 @@ class SwitchDiaNoche(QWidget):
     def actualizar_tooltip(self):
         if self._checked:
             self.setToolTip("Modo Oscuro activado (Clic para cambiar a Modo Claro)")
+            self.setAccessibleDescription(
+                "Modo oscuro activado. Pulsa Espacio o Intro para cambiar a modo claro."
+            )
         else:
             self.setToolTip("Modo Claro activado (Clic para cambiar a Modo Oscuro)")
+            self.setAccessibleDescription(
+                "Modo claro activado. Pulsa Espacio o Intro para cambiar a modo oscuro."
+            )
 
     # ---- Propiedad animable de progreso (0.0 = Día, 1.0 = Noche) ----
     @pyqtProperty(float)
@@ -100,6 +112,12 @@ class SwitchDiaNoche(QWidget):
     def toggle(self):
         self.setChecked(not self._checked, animar=True)
         self.toggled.emit(self._checked)
+
+    def _notificar_animacion_finalizada(self):
+        """Informa cuándo termina la transición visual del interruptor."""
+        target = 1.0 if self._checked else 0.0
+        if abs(self._progress - target) < 0.001:
+            self.animationFinished.emit(self._checked)
 
     # ---- Eventos de interacción ----
     def mousePressEvent(self, event):
@@ -162,8 +180,8 @@ class SwitchDiaNoche(QWidget):
 
         if p > 0.0:
             border_noche = QLinearGradient(0, 0, 0, h)
-            border_noche.setColorAt(0.0, QColor("#000000"))
-            border_noche.setColorAt(1.0, QColor("#6c7384"))
+            border_noche.setColorAt(0.0, QColor("#273449"))
+            border_noche.setColorAt(1.0, QColor("#46546b"))
             painter.setOpacity(p)
             painter.setPen(QPen(border_noche, border_w))
             painter.setBrush(Qt.NoBrush)
@@ -324,8 +342,18 @@ class SwitchDiaNoche(QWidget):
         # Resaltado al hacer hover
         if self._hover:
             painter.save()
-            hover_pen = QPen(QColor(255, 255, 255, 75), 1.5)
+            hover_pen = QPen(QColor(203, 213, 225, 45), 1.5)
             painter.setPen(hover_pen)
             painter.setBrush(Qt.NoBrush)
             painter.drawPath(border_path)
+            painter.restore()
+        if self.hasFocus():
+            painter.save()
+            painter.setPen(QPen(QColor("#f59e0b"), 3.0))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(
+                QRectF(3, 3, w - 6, h - 6),
+                radius - 3,
+                radius - 3,
+            )
             painter.restore()

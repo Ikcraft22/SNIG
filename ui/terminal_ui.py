@@ -508,7 +508,7 @@ class InterfazTerminal:
         
         print(f"\nTotal a pagar: {MONEDA}{resumen['total']:.0f}")
         print("\nMétodos de pago:")
-        opciones_pago = [("efectivo", "Efectivo"), ("tarjeta", "Tarjeta"), ("transferencia", "Transferencia")]
+        opciones_pago = [("efectivo", "Efectivo"), ("transferencia", "Transferencia")]
         idx = self.seleccionar_opcion(opciones_pago, prompt="Selecciona método de pago")
         if idx is None:
             print("Operación cancelada, usando efectivo por defecto")

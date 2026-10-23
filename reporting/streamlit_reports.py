@@ -32,6 +32,7 @@ from database.models import (
     VentaItem,
 )
 from config.settings import MONEDA
+from reporting.pdf_export import generar_reporte_pdf
 
 
 # ==============================================================================
@@ -94,6 +95,25 @@ def configurar_pagina():
     st.markdown(
         """
         <style>
+        :focus-visible {
+            outline: 3px solid #b45309 !important;
+            outline-offset: 3px !important;
+        }
+        button, input, select, textarea {
+            min-height: 2.75rem;
+        }
+        [data-testid="stMarkdownContainer"] p,
+        [data-testid="stWidgetLabel"] {
+            line-height: 1.5;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                scroll-behavior: auto !important;
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
         .main-header {
             font-size: 2.2rem;
             font-weight: 700;
@@ -128,7 +148,7 @@ def configurar_pagina():
         }
         .metric-subtitle {
             font-size: 0.85rem;
-            color: #10b981;
+            color: #166534;
             margin-top: 4px;
         }
         .badge-danger {
@@ -159,6 +179,26 @@ def configurar_pagina():
         """,
         unsafe_allow_html=True,
     )
+
+
+def mostrar_grafica_accesible(
+    figura: go.Figure,
+    datos: pd.DataFrame,
+    clave: str,
+) -> None:
+    """Muestra una gráfica con controles de teclado y una alternativa tabular."""
+    figura.update_layout(
+        font=dict(size=14),
+        title_font_size=18,
+        margin=dict(l=28, r=24, t=56, b=32),
+    )
+    st.plotly_chart(
+        figura,
+        use_container_width=True,
+        config={"displayModeBar": True, "displaylogo": False, "scrollZoom": False},
+    )
+    with st.expander(f"Ver datos de la gráfica: {clave}", expanded=False):
+        st.dataframe(datos, use_container_width=True, hide_index=True)
 
 
 # ==============================================================================
@@ -668,7 +708,7 @@ def render_modulo_ventas(datos: Dict[str, pd.DataFrame]):
             )
 
         fig_tiempo.update_layout(template="plotly_white", margin=dict(l=20, r=20, t=40, b=20), hovermode="x unified")
-        st.plotly_chart(fig_tiempo, use_container_width=True)
+        mostrar_grafica_accesible(fig_tiempo, df_tiempo, "Ventas en el tiempo")
 
     with col_der:
         # Distribución por Método de Pago
@@ -709,7 +749,7 @@ def render_modulo_ventas(datos: Dict[str, pd.DataFrame]):
             )
 
         fig_metodo.update_layout(template="plotly_white", margin=dict(l=20, r=20, t=40, b=20))
-        st.plotly_chart(fig_metodo, use_container_width=True)
+        mostrar_grafica_accesible(fig_metodo, df_metodos, "Ventas por método de pago")
 
     # Top Productos Vendidos
     if not df_items.empty:
@@ -744,7 +784,7 @@ def render_modulo_ventas(datos: Dict[str, pd.DataFrame]):
                 labels={"Subtotal": f"Ingresos ({MONEDA})", "Producto": "Producto"},
             )
             fig_top_rec.update_layout(template="plotly_white", margin=dict(l=20, r=20, t=40, b=20))
-            st.plotly_chart(fig_top_rec, use_container_width=True)
+            mostrar_grafica_accesible(fig_top_rec, df_top_recaudacion, "Productos por recaudación")
 
         with col_top2:
             fig_top_uni = px.bar(
@@ -758,7 +798,7 @@ def render_modulo_ventas(datos: Dict[str, pd.DataFrame]):
                 labels={"Cantidad": "Unidades", "Producto": "Producto"},
             )
             fig_top_uni.update_layout(template="plotly_white", margin=dict(l=20, r=20, t=40, b=20))
-            st.plotly_chart(fig_top_uni, use_container_width=True)
+            mostrar_grafica_accesible(fig_top_uni, df_top_unidades, "Productos por unidades vendidas")
 
     # Tabla interactiva de ventas
     with st.expander("📄 Ver detalle completo de transacciones (Ventas)", expanded=False):
@@ -829,7 +869,7 @@ def render_modulo_inventario(datos: Dict[str, pd.DataFrame]):
             )
 
         fig_stock.update_layout(template="plotly_white", margin=dict(l=20, r=20, t=40, b=20))
-        st.plotly_chart(fig_stock, use_container_width=True)
+        mostrar_grafica_accesible(fig_stock, df_stock_top, "Stock actual")
 
     with col2:
         # Valorización del inventario
@@ -843,7 +883,11 @@ def render_modulo_inventario(datos: Dict[str, pd.DataFrame]):
             color_discrete_sequence=px.colors.qualitative.Safe,
         )
         fig_valor.update_layout(template="plotly_white", margin=dict(l=20, r=20, t=40, b=20))
-        st.plotly_chart(fig_valor, use_container_width=True)
+        mostrar_grafica_accesible(
+            fig_valor,
+            df_presentaciones.groupby("TipoPresentacion", as_index=False)["ValorTotalVenta"].sum(),
+            "Valor del inventario por presentación",
+        )
 
     # Semáforo de stock bajo / crítico
     st.markdown("---")
@@ -936,7 +980,7 @@ def render_modulo_movimientos(datos: Dict[str, pd.DataFrame]):
             )
 
         fig_mov.update_layout(template="plotly_white", margin=dict(l=20, r=20, t=40, b=20))
-        st.plotly_chart(fig_mov, use_container_width=True)
+        mostrar_grafica_accesible(fig_mov, df_mov_tiempo, "Movimientos en el tiempo")
 
     with col2:
         # Proporción por Tipo de Movimiento
@@ -951,7 +995,7 @@ def render_modulo_movimientos(datos: Dict[str, pd.DataFrame]):
             color_discrete_map=color_map_mov,
         )
         fig_pie_mov.update_layout(template="plotly_white", margin=dict(l=20, r=20, t=40, b=20))
-        st.plotly_chart(fig_pie_mov, use_container_width=True)
+        mostrar_grafica_accesible(fig_pie_mov, df_mov_tipo, "Movimientos por tipo")
 
     # Detalle de movimientos
     with st.expander("📝 Registro histórico detallado de movimientos", expanded=False):
@@ -1109,7 +1153,7 @@ def render_explorador_personalizado(datos: Dict[str, pd.DataFrame]):
             )
 
         fig.update_layout(template="plotly_white", margin=dict(l=20, r=20, t=50, b=20))
-        st.plotly_chart(fig, use_container_width=True)
+        mostrar_grafica_accesible(fig, df_target, "Explorador gráfico personalizado")
 
     except Exception as e:
         st.error(f"❌ Error al generar la gráfica con la combinación seleccionada: {e}")
@@ -1146,11 +1190,11 @@ def generar_excel_completo(datos: Dict[str, pd.DataFrame]) -> bytes:
 
 
 def render_modulo_exportacion(datos: Dict[str, pd.DataFrame]):
-    """Permite descargar reportes completos en formato Excel y CSV."""
+    """Permite descargar reportes completos en formato PDF, Excel y CSV."""
     st.subheader("📥 Centro de Exportación de Reportes")
     st.caption("Descarga informes listos para auditorías, contabilidad o análisis externo.")
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
 
     with c1:
         st.markdown("#### 📊 Reporte Completo Multitabla (Excel)")
@@ -1185,6 +1229,17 @@ def render_modulo_exportacion(datos: Dict[str, pd.DataFrame]):
             use_container_width=True,
         )
 
+    with c4:
+        st.markdown("#### 📄 Reporte completo (PDF)")
+        pdf_data = generar_reporte_pdf(datos)
+        st.download_button(
+            label="💾 Descargar Reporte (.pdf)",
+            data=pdf_data,
+            file_name=f"Reporte_General_Inventario_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+
 
 # ==============================================================================
 # ENTRADA PRINCIPAL DEL DASHBOARD
@@ -1194,10 +1249,10 @@ def main():
     """Función principal de ejecución de la aplicación Streamlit."""
     configurar_pagina()
 
-    st.markdown('<div class="main-header">📊 Dashboard de Reportes & Analítica</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="sub-header">Visualización integral de ventas, control de inventario y auditoría de movimientos con múltiples tipos de gráficas interactivas.</div>',
-        unsafe_allow_html=True,
+    st.title("📊 Dashboard de Reportes y Analítica")
+    st.caption(
+        "Visualización integral de ventas, control de inventario y auditoría de movimientos "
+        "con múltiples tipos de gráficas interactivas."
     )
 
     # 1. Cargar datos

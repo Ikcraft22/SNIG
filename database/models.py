@@ -1,8 +1,26 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Enum, ForeignKey, Text, Boolean
+import json
+from datetime import datetime
+from enum import Enum as PythonEnum
+
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    Text,
+    Boolean,
+    event,
+    insert,
+    select,
+    update,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database.connection import Base
-from datetime import datetime
 import enum
 
 # ============== ENUMS ==============
@@ -24,6 +42,14 @@ class EstadoVenta(str, enum.Enum):
 
 # ============== MODELOS ==============
 
+productos_proveedores = Table(
+    "productos_proveedores",
+    Base.metadata,
+    Column("producto_id", Integer, ForeignKey("productos.id", ondelete="CASCADE"), primary_key=True),
+    Column("proveedor_id", Integer, ForeignKey("proveedores.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
 class Producto(Base):
     """Modelo de Producto"""
     __tablename__ = "productos"
@@ -41,12 +67,39 @@ class Producto(Base):
     presentaciones = relationship("Presentacion", back_populates="producto", cascade="all, delete-orphan")
     movimientos = relationship("MovimientoInventario", back_populates="producto", cascade="all, delete-orphan")
     ventas_items = relationship("VentaItem", back_populates="producto")
+    proveedores = relationship(
+        "Proveedor", secondary=productos_proveedores, back_populates="productos"
+    )
     
     fecha_creacion = Column(DateTime, server_default=func.now())
     fecha_actualizacion = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
     def __repr__(self):
         return f"<Producto(gtin={self.gtin}, nombre={self.nombre})>"
+
+
+class Proveedor(Base):
+    """Proveedor de productos del inventario."""
+
+    __tablename__ = "proveedores"
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(255), nullable=False, index=True)
+    contacto = Column(String(255))
+    telefono = Column(String(50))
+    email = Column(String(255))
+    direccion = Column(Text)
+    notas = Column(Text)
+    activo = Column(Boolean, nullable=False, default=True)
+    fecha_creacion = Column(DateTime, server_default=func.now())
+    fecha_actualizacion = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    productos = relationship(
+        "Producto", secondary=productos_proveedores, back_populates="proveedores"
+    )
+
+    def __repr__(self):
+        return f"<Proveedor(nombre={self.nombre}, activo={self.activo})>"
 
 
 class Presentacion(Base):
@@ -156,3 +209,124 @@ class Usuario(Base):
     
     def __repr__(self):
         return f"<Usuario(nombre={self.nombre}, rol={self.rol})>"
+
+
+class SyncState(Base):
+    """Secuencia global que mantiene ordenadas las transacciones del feed de sync."""
+
+    __tablename__ = "sync_state"
+
+    id = Column(Integer, primary_key=True)
+    last_sequence = Column(Integer, nullable=False, default=0)
+
+
+class SyncChange(Base):
+    """Cambio persistente disponible para clientes que consumen la API de sync."""
+
+    __tablename__ = "sync_changes"
+
+    id = Column(Integer, primary_key=True, autoincrement=False)
+    entity_type = Column(String(50), nullable=False, index=True)
+    entity_id = Column(Integer, nullable=False, index=True)
+    operation = Column(String(10), nullable=False)
+    payload = Column(Text, nullable=False)
+    occurred_at = Column(DateTime, nullable=False, server_default=func.now(), index=True)
+
+
+def serializar_entidad_sync(modelo, entidad, connection=None):
+    """Convierte las columnas escalares de una entidad en un payload JSON seguro."""
+    valores = None
+    if connection is not None:
+        primary_key = modelo.__mapper__.primary_key[0]
+        entity_id = getattr(entidad, primary_key.key)
+        row = connection.execute(
+            select(modelo.__table__).where(primary_key == entity_id)
+        ).mappings().one_or_none()
+        if row is not None:
+            valores = row
+
+    payload = {}
+    for columna in modelo.__table__.columns:
+        valor = (
+            valores[columna.key]
+            if valores is not None
+            else getattr(entidad, columna.key)
+        )
+        if isinstance(valor, PythonEnum):
+            valor = valor.value
+        elif isinstance(valor, datetime):
+            valor = valor.isoformat()
+        payload[columna.key] = valor
+    return payload
+
+
+def registrar_evento_sync(connection, entity_type, entity_id, operation, payload):
+    """Inserta un cambio en la misma transacción que modifica la entidad."""
+    dialect = connection.dialect.name
+    if dialect == "sqlite":
+        from sqlalchemy.dialects.sqlite import insert as dialect_insert
+
+        seed = dialect_insert(SyncState).values(id=1, last_sequence=0).on_conflict_do_nothing(
+            index_elements=["id"]
+        )
+    elif dialect == "mysql":
+        from sqlalchemy.dialects.mysql import insert as dialect_insert
+
+        seed = dialect_insert(SyncState).values(id=1, last_sequence=0).on_duplicate_key_update(
+            id=SyncState.id
+        )
+    else:
+        seed = insert(SyncState).values(id=1, last_sequence=0)
+    connection.execute(seed)
+
+    secuencia = connection.execute(
+        select(SyncState.last_sequence)
+        .where(SyncState.id == 1)
+        .with_for_update()
+    ).scalar_one()
+    secuencia += 1
+    connection.execute(
+        update(SyncState)
+        .where(SyncState.id == 1)
+        .values(last_sequence=secuencia)
+    )
+    connection.execute(
+        insert(SyncChange).values(
+            id=secuencia,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            operation=operation,
+            payload=json.dumps(payload, ensure_ascii=False, allow_nan=False),
+        )
+    )
+
+
+def _registrar_cambio_mapeado(mapper, connection, entidad, operation):
+    modelo = mapper.class_
+    primary_key = mapper.primary_key[0].key
+    payload = serializar_entidad_sync(
+        modelo,
+        entidad,
+        connection if operation == "upsert" else None,
+    )
+    registrar_evento_sync(
+        connection,
+        mapper.local_table.name,
+        getattr(entidad, primary_key),
+        operation,
+        payload,
+    )
+
+
+def _registrar_alta_o_actualizacion(mapper, connection, entidad):
+    _registrar_cambio_mapeado(mapper, connection, entidad, "upsert")
+
+
+def _registrar_eliminacion(mapper, connection, entidad):
+    _registrar_cambio_mapeado(mapper, connection, entidad, "delete")
+
+
+for _modelo_sync in (Producto, Presentacion, MovimientoInventario, Venta, VentaItem):
+    event.listen(_modelo_sync, "after_insert", _registrar_alta_o_actualizacion)
+    event.listen(_modelo_sync, "after_update", _registrar_alta_o_actualizacion)
+    event.listen(_modelo_sync, "after_delete", _registrar_eliminacion)
