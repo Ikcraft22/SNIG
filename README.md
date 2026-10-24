@@ -93,6 +93,20 @@ pip install -r requirements.txt
   streamlit run reporting/streamlit_reports.py
   ```
 
+### Build de escritorio para Windows
+
+La primera build de Windows se puede descargar como `SNIG-v1.2.0-Windows-x64.zip` desde la sección Releases de GitHub. Descarga y extrae la carpeta completa, luego inicia `SNIG.exe`; no ejecutes el EXE separado de la carpeta `_internal`.
+
+Para generar de nuevo la build desde Windows:
+
+```powershell
+python -m pip install -r requirements.txt
+python -m pip install pyinstaller==6.20.0
+python -m PyInstaller --noconfirm --clean SNIG.spec
+```
+
+El ejecutable y sus dependencias se generan en `dist/SNIG/`. No se incluyen la base de datos local ni el archivo `.env`; la aplicación crea su base de datos al iniciar.
+
 ## Uso recomendado
 
 ### Interfaz gráfica

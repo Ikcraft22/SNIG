@@ -1748,12 +1748,15 @@ class VentanaPrincipal(QMainWindow):
                 QMessageBox.warning(self, "Error", f"No se encontró el script de reportes en: {script_path}")
                 return
 
-            cmd = [
-                sys.executable, "-m", "streamlit", "run",
-                str(script_path),
-                "--server.headless", "true",
-                "--server.port", "8501"
-            ]
+            if getattr(sys, "frozen", False):
+                cmd = [sys.executable, "--reportes"]
+            else:
+                cmd = [
+                    sys.executable, "-m", "streamlit", "run",
+                    str(script_path),
+                    "--server.headless", "true",
+                    "--server.port", "8501"
+                ]
             self.proceso_streamlit = subprocess.Popen(
                 cmd,
                 stdout=subprocess.DEVNULL,

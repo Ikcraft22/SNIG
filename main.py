@@ -8,8 +8,17 @@ import sys
 import json
 import time
 import logging
+import os
 from datetime import date
 from pathlib import Path
+
+if getattr(sys, "frozen", False):
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None:
+            setattr(sys, stream_name, open(os.devnull, "w", encoding="utf-8"))
+        elif hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
 
 # Configurar logging
 logging.basicConfig(
@@ -78,6 +87,19 @@ def ejecutar_reportes_streamlit():
     import subprocess
     script_path = Path(__file__).resolve().parent / "reporting" / "streamlit_reports.py"
     print("\n🚀 Iniciando servidor de reportes interactivos con Streamlit...")
+    if getattr(sys, "frozen", False):
+        from streamlit.web.cli import main as streamlit_main
+
+        sys.argv = [
+            "streamlit",
+            "run",
+            str(script_path),
+            "--server.headless",
+            "true",
+        ]
+        streamlit_main()
+        return
+
     cmd = [sys.executable, "-m", "streamlit", "run", str(script_path)]
     try:
         subprocess.run(cmd)
