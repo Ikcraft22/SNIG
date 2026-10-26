@@ -1,52 +1,96 @@
-# Entorno virtual
+# ============================================================
+# .gitignore — Sistema de Inventario y POS
+# ============================================================
+
+# ── Entorno virtual ──────────────────────────────────────────
 .venv/
 venv/
 env/
+ENV/
 
-# Python
+# ── Python compilado / cachés ────────────────────────────────
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+*.pyw
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.pytype/
+*.cover
+*.coverage
+.coverage
+htmlcov/
 
-# Archivos de entorno y configuración local
+# ── Secrets y configuración local ───────────────────────────
 .env
 .env.*
+.env.local
+.env.production
 *.local
+secrets.json
+secrets.yaml
 
-# Bases de datos locales
+# ── Base de datos y archivos de datos locales ────────────────
 *.db
+*.sqlite
 *.sqlite3
+*.db-shm
+*.db-wal
+backups/
 
-# Logs y cachés
+# ── Logs ─────────────────────────────────────────────────────
 *.log
 logs/
 
-# PyQt / GUI temporal
+# ── Estado de la app / archivos temporales ───────────────────
+.startup_state.json
 *.autosave
 *.bak
 *.tmp
+*.temp
 
-# IDE/editor
+# ── Binarios e iconos grandes (no necesarios en repo) ────────
+*.af
+*.rar
+*.zip
+*.tar.gz
+# Mantener Logo.svg (vectorial, liviano) pero ignorar binarios pesados
+Logo.ico
+Logo.af
+Icono.ico
+Icono.jpeg
+Icono.webp
+
+# ── IDE / Editores ───────────────────────────────────────────
 .vscode/
 .idea/
+*.suo
+*.user
+*.swp
+*.swo
+*~
 
-# Sistema operativo
+# ── Sistema operativo ────────────────────────────────────────
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
+ehthumbs.db
+desktop.ini
 
-# Archivos de compilación
+# ── Empaquetado / distribución ───────────────────────────────
 build/
 dist/
 *.egg-info/
+*.egg
+MANIFEST
+site/
 
-# Archivos de inicio propios de la app
-.startup_state.json
-.startup_state.json
-.startup_state.json
-Ficha-3251447-Proyecto-SISTEMA-DE-INVENTARIO-PARA-UNA-TIENDA.rar
-.startup_state.json
-inventario.db
+# ── PyInstaller ──────────────────────────────────────────────
+*.spec
+
+# ── Reportes y exportaciones generadas ──────────────────────
+exports/
+reportes_generados/
