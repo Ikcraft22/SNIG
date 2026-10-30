@@ -7,9 +7,10 @@ Proporciona:
 - Panel de administración
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, Response
+from flask import Flask, render_template, request, jsonify, redirect, url_for, Response, send_file
 from flask_cors import CORS
 from datetime import datetime, date
+import hmac
 import json
 import logging
 import os
@@ -23,7 +24,7 @@ from core.barcode_scanner import BarcodeLector
 from core.inventory_manager import GestorInventario
 from core.pos_manager import GestorPOS
 from api.gtin_lookup import GTINBuscador
-from config.settings import MONEDA, DEBUG
+from config.settings import DEBUG, MONEDA, SYNC_API_TOKEN, obtener_metodos_pago_disponibles
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -40,6 +41,9 @@ init_db()
 
 def obtener_db():
     """Obtiene una sesión de BD"""
+    session_factory = app.config.get("DB_SESSION_FACTORY")
+    if session_factory is not None:
+        return session_factory()
     return SessionLocal()
 
 def crear_gestores():
@@ -48,9 +52,24 @@ def crear_gestores():
     return GestorInventario(db), GestorPOS(db), db
 
 
+def requiere_token_sync():
+    """Valida un bearer token y mantiene el feed cerrado si no hay secreto configurado."""
+    if not SYNC_API_TOKEN:
+        return jsonify({'error': 'La API de sincronización no está habilitada'}), 503
+
+    esquema, _, token = request.headers.get('Authorization', '').partition(' ')
+    if esquema.lower() != 'bearer' or not hmac.compare_digest(token, SYNC_API_TOKEN):
+        return jsonify({'error': 'Credenciales de sincronización inválidas'}), 401
+    return None
+
+
 @app.route('/api/sync/cursor', methods=['GET'])
 def obtener_cursor_sync():
     """Devuelve el cursor de referencia antes de que un cliente descargue el estado inicial."""
+    error_auth = requiere_token_sync()
+    if error_auth:
+        return error_auth
+
     db = obtener_db()
     try:
         cursor = db.query(SyncState.last_sequence).filter(SyncState.id == 1).scalar() or 0
@@ -65,6 +84,10 @@ def obtener_cursor_sync():
 @app.route('/api/sync/changes', methods=['GET'])
 def listar_cambios_sync():
     """Entrega cambios incrementales en orden de cursor."""
+    error_auth = requiere_token_sync()
+    if error_auth:
+        return error_auth
+
     try:
         cursor = int(request.args.get("cursor", "0"))
         limit = int(request.args.get("limit", "100"))
@@ -121,12 +144,100 @@ def inventario():
 @app.route('/pos')
 def pos():
     """Página de punto de venta"""
-    return render_template('pos.html', moneda=MONEDA)
+    return render_template(
+        'pos.html',
+        moneda=MONEDA,
+        metodos_pago=obtener_metodos_pago_disponibles(),
+    )
 
 @app.route('/reportes')
 def reportes():
     """Página de reportes"""
     return render_template('reportes.html', moneda=MONEDA)
+
+@app.route('/api/reportes/exportar', methods=['GET'])
+def api_reportes_exportar():
+    """Descarga PDF, Excel multitabla o CSV aplicando filtros opcionales."""
+    from io import BytesIO
+
+    try:
+        from reporting.streamlit_reports import (
+            aplicar_filtros,
+            cargar_datos_completos,
+            generar_excel_completo,
+            nombre_archivo_exportacion,
+        )
+        from reporting.pdf_export import generar_reporte_pdf
+        import pandas as pd
+
+        formato = request.args.get("formato", "pdf").lower()
+        if formato not in {"csv", "xlsx", "pdf"}:
+            return jsonify({"error": "formato debe ser csv, xlsx o pdf"}), 400
+        dataset = request.args.get("dataset", "ventas")
+        if formato == "csv" and dataset not in {
+            "ventas", "presentaciones", "productos", "items", "movimientos"
+        }:
+            return jsonify({"error": "dataset CSV no válido"}), 400
+
+        fecha_inicio_texto = request.args.get("fecha_inicio", "").strip()
+        fecha_fin_texto = request.args.get("fecha_fin", "").strip()
+        if bool(fecha_inicio_texto) != bool(fecha_fin_texto):
+            return jsonify({"error": "fecha_inicio y fecha_fin deben enviarse juntas"}), 400
+
+        fecha_inicio = fecha_fin = None
+        if fecha_inicio_texto:
+            try:
+                fecha_inicio = datetime.strptime(fecha_inicio_texto, "%Y-%m-%d").date()
+                fecha_fin = datetime.strptime(fecha_fin_texto, "%Y-%m-%d").date()
+            except ValueError:
+                return jsonify({"error": "Las fechas deben tener formato YYYY-MM-DD"}), 400
+            if fecha_fin < fecha_inicio:
+                return jsonify({"error": "fecha_fin no puede ser anterior a fecha_inicio"}), 400
+
+        filtros = {
+            "periodo_opcion": "Rango Personalizado" if fecha_inicio else "Todo el Historial",
+            "fecha_inicio": pd.Timestamp(fecha_inicio or datetime.now().date()),
+            "fecha_fin": pd.Timestamp(fecha_fin or datetime.now().date()) + pd.Timedelta(days=1, microseconds=-1),
+            "metodo_pago": request.args.get("metodo_pago", "Todos").strip() or "Todos",
+            "producto": request.args.get("producto", "Todos").strip() or "Todos",
+            "umbral_alerta": 10,
+        }
+
+        db = obtener_db()
+        try:
+            datos = aplicar_filtros(cargar_datos_completos(db=db), filtros)
+        finally:
+            db.close()
+
+        if formato == "csv":
+            contenido = datos[dataset].to_csv(index=False).encode("utf-8-sig")
+            prefijos = {
+                "ventas": "Reporte_Ventas",
+                "presentaciones": "Reporte_Inventario",
+                "productos": "Reporte_Productos",
+                "items": "Reporte_Detalle_Ventas",
+                "movimientos": "Reporte_Movimientos",
+            }
+            nombre = nombre_archivo_exportacion(prefijos[dataset], "csv", filtros)
+            mimetype = "text/csv; charset=utf-8"
+        elif formato == "xlsx":
+            contenido = generar_excel_completo(datos)
+            nombre = nombre_archivo_exportacion("Reporte_General_Inventario", "xlsx", filtros)
+            mimetype = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        else:
+            contenido = generar_reporte_pdf(datos)
+            nombre = nombre_archivo_exportacion("Reporte_General_Inventario", "pdf", filtros)
+            mimetype = "application/pdf"
+
+        return send_file(
+            BytesIO(contenido),
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=nombre,
+        )
+    except Exception:
+        logger.exception("Error al generar exportación de reportes")
+        return jsonify({"error": "No se pudo generar la exportación"}), 500
 
 # ============== API - PRODUCTOS ==============
 
@@ -157,7 +268,6 @@ def listar_productos():
                 'id': p.id,
                 'gtin': p.gtin,
                 'nombre': p.nombre,
-                'laboratorio': p.laboratorio,
                 'presentaciones': [
                     {
                         'id': pres.id,
@@ -202,7 +312,6 @@ def obtener_producto(gtin):
             'id': producto.id,
             'gtin': producto.gtin,
             'nombre': producto.nombre,
-            'laboratorio': producto.laboratorio,
             'descripcion': producto.descripcion,
             'presentaciones': [
                 {
@@ -237,7 +346,6 @@ def crear_producto():
         producto = inventario.registrar_producto(
             gtin=datos.get('gtin'),
             nombre=datos.get('nombre'),
-            laboratorio=datos.get('laboratorio'),
             descripcion=datos.get('descripcion')
         )
         
@@ -521,6 +629,10 @@ def no_encontrado(e):
 def checkout_venta():
     """Procesa la venta del carrito actual usando el gestor POS real."""
     datos = request.get_json(silent=True) or {}
+    metodo_pago = str(datos.get('metodo_pago', 'efectivo')).strip().lower()
+    if metodo_pago not in obtener_metodos_pago_disponibles():
+        return jsonify({'error': 'El método de pago seleccionado no está habilitado'}), 400
+
     items = datos.get('items') or []
     if not isinstance(items, list) or not items:
         return jsonify({'error': 'El carrito está vacío'}), 400
@@ -553,7 +665,7 @@ def checkout_venta():
 
         venta = gestor.crear_venta(
             numero_ticket=gestor.generar_numero_ticket(),
-            metodo_pago=str(datos.get('metodo_pago', 'efectivo')).lower(),
+            metodo_pago=metodo_pago,
             usuario=str(datos.get('usuario', 'cajero')).strip() or 'cajero',
             notas=datos.get('notas'),
         )

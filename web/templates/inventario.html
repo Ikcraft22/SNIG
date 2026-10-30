@@ -59,8 +59,8 @@
                 </div>
 
                 <form id="search-form" class="search-box" role="search">
-                    <label class="visually-hidden" for="gtin-input">Buscar producto por GTIN</label>
-                    <input type="text" id="gtin-input" placeholder="Escanea o escribe GTIN..." autocomplete="off" />
+                    <label class="visually-hidden" for="gtin-input">Buscar producto por Barcode</label>
+                    <input type="text" id="gtin-input" placeholder="Escanea o escribe Barcode..." autocomplete="off" />
                     <button type="submit">🔎 Buscar</button>
                 </form>
 
@@ -70,7 +70,7 @@
                     <table aria-label="Productos del inventario">
                         <thead>
                             <tr>
-                                <th scope="col">GTIN</th>
+                                <th scope="col">Barcode</th>
                                 <th scope="col">Producto</th>
                                 <th scope="col">Presentación</th>
                                 <th scope="col">Stock</th>
@@ -199,7 +199,7 @@
             event.preventDefault();
             const gtin = document.getElementById('gtin-input').value.trim();
             if (!gtin) {
-                setFeedback('Ingresa un GTIN para consultar el producto.', true);
+                setFeedback('Ingresa un Barcode para consultar el producto.', true);
                 return;
             }
             try {

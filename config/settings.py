@@ -4,6 +4,20 @@ from pathlib import Path
 
 load_dotenv()
 
+# Mantener en False mientras el login y la gestión de usuarios estén desactivados.
+AUTENTICACION_HABILITADA = False
+
+# Activar únicamente si se habilita el cobro con tarjeta en toda la aplicación.
+PAGO_TARJETA_HABILITADO = False
+
+
+def obtener_metodos_pago_disponibles():
+    """Devuelve los métodos de pago habilitados para registrar ventas."""
+    metodos = ["efectivo", "transferencia"]
+    if PAGO_TARJETA_HABILITADO:
+        metodos.append("tarjeta")
+    return tuple(metodos)
+
 # ============== CONFIGURACIÓN DE BASE DE DATOS ==============
 DB_ENGINE = os.getenv("DB_ENGINE", "sqlite").lower()
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
@@ -47,6 +61,10 @@ CSV_FILE = os.path.join(DATA_DIR, "CATALOGO_PRODUCTOS.csv")
 DEBUG = os.getenv("DEBUG", "True") == "True"
 FLASK_PORT = int(os.getenv("FLASK_PORT", 5000))
 FLASK_HOST = os.getenv("FLASK_HOST", "0.0.0.0")
+SYNC_API_TOKEN = os.getenv("SYNC_API_TOKEN", "").strip()
+ALERTA_STOCK_INTERVALO_MINUTOS = int(os.getenv("ALERTA_STOCK_INTERVALO_MINUTOS", "15"))
+if ALERTA_STOCK_INTERVALO_MINUTOS < 1:
+    raise ValueError("ALERTA_STOCK_INTERVALO_MINUTOS debe ser al menos 1")
 
 # ============== PRESENTACIONES DE PRODUCTOS ==============
 PRESENTACIONES = {

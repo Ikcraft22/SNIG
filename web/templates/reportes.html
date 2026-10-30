@@ -15,6 +15,9 @@
         .kpi-card strong { display: block; margin-top: 0.5rem; font-size: 1.5rem; color: var(--color-primary); font-variant-numeric: tabular-nums; }
         .status-list { list-style: none; padding: 0; margin: 0.8rem 0 0; display: grid; gap: 0.5rem; }
         .status-list li { background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 0.6rem 0.7rem; }
+        .export-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.8rem; align-items: end; }
+        .export-form label { display: grid; gap: 0.35rem; }
+        .export-form input, .export-form select { min-height: 42px; padding: 0.5rem; }
     </style>
 </head>
 <body>
@@ -52,6 +55,42 @@
             <h2 id="streamlit-title">🚀 Dashboard avanzado</h2>
             <p>El sistema incluye un panel interactivo en Streamlit con visualización de ventas, gráficos, inventario y exportación de datos.</p>
             <a class="btn btn-info" href="http://localhost:8501" target="_blank" rel="noopener noreferrer">Abrir Streamlit</a>
+        </section>
+
+        <section class="reporte-card" aria-labelledby="export-title" style="margin-top:1.25rem;">
+            <h2 id="export-title">📥 Exportar reportes</h2>
+            <p>Descarga datos filtrados en PDF, Excel multitabla o CSV. Los rangos de fecha son inclusivos.</p>
+            <form class="export-form" action="{{ url_for('api_reportes_exportar') }}" method="get">
+                <label for="export-format">Formato
+                    <select id="export-format" name="formato">
+                        <option value="pdf">PDF completo</option>
+                        <option value="xlsx">Excel multitabla</option>
+                        <option value="csv">CSV</option>
+                    </select>
+                </label>
+                <label for="export-dataset">Tabla CSV
+                    <select id="export-dataset" name="dataset">
+                        <option value="ventas">Ventas</option>
+                        <option value="presentaciones">Inventario</option>
+                        <option value="productos">Productos</option>
+                        <option value="items">Detalle de ventas</option>
+                        <option value="movimientos">Movimientos</option>
+                    </select>
+                </label>
+                <label for="export-date-start">Desde
+                    <input id="export-date-start" type="date" name="fecha_inicio" />
+                </label>
+                <label for="export-date-end">Hasta
+                    <input id="export-date-end" type="date" name="fecha_fin" />
+                </label>
+                <label for="export-payment">Método de pago
+                    <input id="export-payment" type="text" name="metodo_pago" placeholder="Todos" />
+                </label>
+                <label for="export-product">Producto
+                    <input id="export-product" type="text" name="producto" placeholder="Todos" />
+                </label>
+                <button class="btn btn-primary" type="submit">Descargar reporte</button>
+            </form>
         </section>
 
         <div class="kpi-grid">

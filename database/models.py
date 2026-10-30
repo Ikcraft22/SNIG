@@ -56,12 +56,8 @@ class Producto(Base):
     
     id = Column(Integer, primary_key=True)
     gtin = Column(String(20), unique=True, nullable=False, index=True)
-    cum = Column(String(50), unique=True, nullable=True, index=True)
     nombre = Column(String(255), nullable=False, index=True)
     descripcion = Column(Text)
-    principio_activo = Column(String(255))
-    laboratorio = Column(String(255))
-    registro_sanitario = Column(String(100))
     
     # Relaciones
     presentaciones = relationship("Presentacion", back_populates="producto", cascade="all, delete-orphan")
@@ -204,6 +200,7 @@ class Usuario(Base):
     email = Column(String(255), unique=True, nullable=True)
     rol = Column(String(50), default="cajero")  # "admin", "cajero", "inventario"
     activo = Column(Boolean, default=True)
+    password_hash = Column(String(255), nullable=True)
     
     fecha_creacion = Column(DateTime, server_default=func.now())
     

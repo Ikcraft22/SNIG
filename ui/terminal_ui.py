@@ -8,6 +8,7 @@ Proporciona un menú interactivo para:
 
 import logging
 import os
+import sys
 from typing import Optional
 from database.connection import SessionLocal, init_db
 from database.models import Producto
@@ -15,7 +16,7 @@ from core.barcode_scanner import EscanerProducto
 from core.inventory_manager import GestorInventario
 from core.pos_manager import GestorPOS, calcular_vuelto
 from api.gtin_lookup import GTINBuscador
-from config.settings import PRESENTACIONES, MONEDA
+from config.settings import MONEDA, PRESENTACIONES, obtener_metodos_pago_disponibles
 
 logger = logging.getLogger(__name__)
 
@@ -24,12 +25,12 @@ class InterfazTerminal:
     
     def __init__(self):
         """Inicializa la interfaz de terminal"""
+        init_db()
         self.db = SessionLocal()
         self.inventario = GestorInventario(self.db)
         self.pos = GestorPOS(self.db)
         self.escaneo = EscanerProducto()
         self.buscador = GTINBuscador()
-        init_db()
     
     def limpiar_pantalla(self):
         """Limpia la pantalla"""
@@ -87,7 +88,7 @@ class InterfazTerminal:
             print("📦 GESTIÓN DE INVENTARIO".center(70))
             print("=" * 70)
             print("\n1. ➕ Registrar nuevo producto")
-            print("2. 🔍 Buscar producto por GTIN")
+            print("2. 🔍 Buscar producto por Barcode")
             print("3. ➡️  Registrar entrada de stock")
             print("4. ⬅️  Registrar salida de stock")
             print("5. ⚠️  Ver productos con stock bajo")
@@ -121,10 +122,10 @@ class InterfazTerminal:
         print("➕ REGISTRAR NUEVO PRODUCTO".center(70))
         print("=" * 70)
         
-        gtin = input("\n📱 Ingresa el GTIN (código de barras): ").strip()
+        gtin = input("\n📱 Ingresa el Barcode: ").strip()
         
         if not gtin:
-            input("❌ GTIN no puede estar vacío. Presiona Enter...")
+            input("❌ Barcode no puede estar vacío. Presiona Enter...")
             return
         
         # Buscar información del producto
@@ -134,11 +135,9 @@ class InterfazTerminal:
         if info_api["encontrado"]:
             print(f"\n✅ Información encontrada en {info_api['datos']['fuente']}")
             nombre = info_api['datos'].get('nombre', '')
-            laboratorio = info_api['datos'].get('marca', '')
         else:
             print("\n⚠️ No se encontró información automática")
             nombre = input("Nombre del producto: ").strip()
-            laboratorio = input("Laboratorio: ").strip()
         
         descripcion = input("Descripción (opcional): ").strip()
         
@@ -146,14 +145,13 @@ class InterfazTerminal:
         producto = self.inventario.registrar_producto(
             gtin=gtin,
             nombre=nombre,
-            laboratorio=laboratorio,
             descripcion=descripcion
         )
         
         if producto:
             print(f"\n✅ Producto registrado exitosamente!")
             print(f"ID: {producto.id}")
-            print(f"GTIN: {producto.gtin}")
+            print(f"Barcode: {producto.gtin}")
             
             # Preguntar por presentaciones
             agregar_presentacion = input("\n¿Agregar presentación? (s/n): ").strip().lower()
@@ -194,16 +192,16 @@ class InterfazTerminal:
             print(f"\n✅ Presentación agregada: {presentacion.tipo.value}")
     
     def buscar_producto(self):
-        """Busca un producto por GTIN"""
+        """Busca un producto por Barcode"""
         self.limpiar_pantalla()
         print("=" * 70)
         print("🔍 BUSCAR PRODUCTO".center(70))
         print("=" * 70)
         
-        gtin = input("\n📱 Escanea o ingresa el GTIN: ").strip()
+        gtin = input("\n📱 Escanea o ingresa el Barcode: ").strip()
         
         if not gtin:
-            input("❌ GTIN no puede estar vacío. Presiona Enter...")
+            input("❌ Barcode no puede estar vacío. Presiona Enter...")
             return
         
         producto = self.inventario.obtener_producto_por_gtin(gtin)
@@ -212,8 +210,7 @@ class InterfazTerminal:
             print(f"\n✅ PRODUCTO ENCONTRADO")
             print("=" * 70)
             print(f"Nombre: {producto.nombre}")
-            print(f"GTIN: {producto.gtin}")
-            print(f"Laboratorio: {producto.laboratorio}")
+            print(f"Barcode: {producto.gtin}")
             print(f"Descripción: {producto.descripcion}")
             
             print("\nPRESENTACIONES:")
@@ -234,7 +231,7 @@ class InterfazTerminal:
         print("➡️  REGISTRAR ENTRADA DE STOCK".center(70))
         print("=" * 70)
         
-        gtin = input("\n📱 Escanea o ingresa el GTIN: ").strip()
+        gtin = input("\n📱 Escanea o ingresa el Barcode: ").strip()
         producto = self.inventario.obtener_producto_por_gtin(gtin)
         
         if not producto:
@@ -278,7 +275,7 @@ class InterfazTerminal:
         print("⬅️  REGISTRAR SALIDA DE STOCK".center(70))
         print("=" * 70)
         
-        gtin = input("\n📱 Escanea o ingresa el GTIN: ").strip()
+        gtin = input("\n📱 Escanea o ingresa el Barcode: ").strip()
         producto = self.inventario.obtener_producto_por_gtin(gtin)
         
         if not producto:
@@ -343,7 +340,7 @@ class InterfazTerminal:
         print("📋 HISTORIAL DE MOVIMIENTOS".center(70))
         print("=" * 70)
         
-        gtin = input("\n📱 Escanea o ingresa el GTIN: ").strip()
+        gtin = input("\n📱 Escanea o ingresa el Barcode: ").strip()
         producto = self.inventario.obtener_producto_por_gtin(gtin)
         
         if not producto:
@@ -405,7 +402,7 @@ class InterfazTerminal:
     
     def agregar_a_carrito(self):
         """Agrega un producto al carrito"""
-        gtin = input("📱 Escanea o ingresa el GTIN: ").strip()
+        gtin = input("📱 Escanea o ingresa el Barcode: ").strip()
         producto = self.inventario.obtener_producto_por_gtin(gtin)
         
         if not producto:
@@ -508,7 +505,15 @@ class InterfazTerminal:
         
         print(f"\nTotal a pagar: {MONEDA}{resumen['total']:.0f}")
         print("\nMétodos de pago:")
-        opciones_pago = [("efectivo", "Efectivo"), ("transferencia", "Transferencia")]
+        etiquetas_pago = {
+            "efectivo": "Efectivo",
+            "transferencia": "Transferencia",
+            "tarjeta": "Tarjeta",
+        }
+        opciones_pago = [
+            (metodo, etiquetas_pago[metodo])
+            for metodo in obtener_metodos_pago_disponibles()
+        ]
         idx = self.seleccionar_opcion(opciones_pago, prompt="Selecciona método de pago")
         if idx is None:
             print("Operación cancelada, usando efectivo por defecto")
@@ -626,3 +631,10 @@ def ejecutar_interfaz_terminal():
     """Punto de entrada para la interfaz de terminal"""
     interfaz = InterfazTerminal()
     interfaz.ejecutar()
+
+
+if __name__ == "__main__":
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+    ejecutar_interfaz_terminal()

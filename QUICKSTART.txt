@@ -54,7 +54,7 @@ PASO 4: INICIALIZAR BASE DE DATOS
 
   $ python init_db.py
 
-Esto creará las tablas y te preguntará si deseas cargar datos de prueba.
+Esto creará las tablas y te preguntará si deseas cargar datos de prueba. No elimina la base de datos ni los registros existentes. La autenticación está desactivada por defecto, por lo que se omite la configuración de usuarios.
 
 
 PASO 5: EJECUTAR LA APLICACIÓN
@@ -62,17 +62,20 @@ PASO 5: EJECUTAR LA APLICACIÓN
 
   $ python main.py
 
-Selecciona tu interfaz:
-  1️⃣  Terminal (CLI) - Línea de comandos
-  2️⃣  GUI - Interfaz gráfica (PyQt5)
-  3️⃣  Web - Interfaz web (http://localhost:5000)
+La interfaz gráfica se abre directamente. Otras opciones:
+
+  Terminal (CLI):       python -m ui.terminal_ui
+  Dashboard:            python main.py --reportes
+  Web:                  python -m web.app
+
+Para la Web, abre http://localhost:5000 en el navegador.
 
 NOTAS ÚTILES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 • En la pestaña Inventario puedes usar clic derecho para abrir un menú contextual.
 • Con Shift + clic derecho aparece una opción distinta para eliminar un producto.
-• En la pestaña POS puedes escanear o escribir un GTIN y presionar Enter para agregarlo directamente al carrito.
+• En la pestaña POS puedes escanear o escribir el Barcode (GTIN) y presionar Enter para agregarlo directamente al carrito.
 • La GUI está optimizada para pantallas táctiles y se inicia maximizada.
 • Los eventos del sistema se muestran en la consola y en la pestaña de Logs de la GUI.
 

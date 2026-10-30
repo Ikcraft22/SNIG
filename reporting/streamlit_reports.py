@@ -12,6 +12,7 @@ Proporciona un dashboard interactivo con múltiples tipos de gráficas:
 from __future__ import annotations
 
 import io
+import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -77,6 +78,87 @@ def preparar_datos_dashboard(productos: List[Dict[str, Any]], ventas: List[Dict[
         "stock": df_stock,
         "ventas": df_ventas
     }
+
+
+def preparar_rendimiento_cajeros(df_ventas: pd.DataFrame) -> pd.DataFrame:
+    """Resume ventas por cajero y estima tickets por hora observada."""
+    columnas = [
+        "Cajero",
+        "TotalVendido",
+        "Transacciones",
+        "TicketPromedio",
+        "TicketsPorHora",
+    ]
+    if df_ventas.empty or "Usuario" not in df_ventas.columns:
+        return pd.DataFrame(columns=columnas)
+
+    ventas = df_ventas.copy()
+    ventas["Usuario"] = ventas["Usuario"].fillna("Sistema").astype(str).str.strip()
+    ventas.loc[ventas["Usuario"] == "", "Usuario"] = "Sistema"
+    if "Total" not in ventas.columns:
+        ventas["Total"] = 0
+    ventas["Total"] = pd.to_numeric(ventas["Total"], errors="coerce").fillna(0)
+
+    filas = []
+    for cajero, grupo in ventas.groupby("Usuario", sort=True):
+        transacciones = (
+            grupo["VentaID"].nunique()
+            if "VentaID" in grupo.columns
+            else grupo["Ticket"].nunique()
+            if "Ticket" in grupo.columns
+            else len(grupo)
+        )
+        marcas_tiempo = pd.to_datetime(
+            grupo.get("FechaHora", pd.Series(dtype="datetime64[ns]")),
+            errors="coerce",
+        ).dropna()
+        horas_observadas = (
+            (marcas_tiempo.max() - marcas_tiempo.min()).total_seconds() / 3600
+            if len(marcas_tiempo) >= 2
+            else 0
+        )
+        filas.append({
+            "Cajero": cajero,
+            "TotalVendido": round(grupo["Total"].sum()),
+            "Transacciones": int(transacciones),
+            "TicketPromedio": round(grupo["Total"].sum() / transacciones) if transacciones else 0,
+            "TicketsPorHora": round(transacciones / horas_observadas, 2) if horas_observadas > 0 else 0,
+        })
+
+    return pd.DataFrame(filas, columns=columnas).sort_values(
+        "TotalVendido", ascending=False
+    ).reset_index(drop=True)
+
+
+def nombre_archivo_exportacion(
+    prefijo: str,
+    extension: str,
+    filtros: Optional[Dict[str, Any]] = None,
+    ahora: Optional[datetime] = None,
+) -> str:
+    """Crea un nombre de descarga con filtros sanitizados y fecha ISO segura."""
+    filtros = filtros or {}
+
+    def segmento(valor: Any) -> str:
+        return re.sub(r"[^A-Za-z0-9-]+", "_", str(valor)).strip("_")[:48]
+
+    partes = [segmento(prefijo)]
+    periodo = filtros.get("periodo_opcion")
+    if periodo:
+        partes.append(segmento(periodo))
+    if periodo == "Rango Personalizado":
+        inicio = filtros.get("fecha_inicio")
+        fin = filtros.get("fecha_fin")
+        if inicio is not None and fin is not None:
+            partes.append(f"{pd.Timestamp(inicio):%Y-%m-%d}_{pd.Timestamp(fin):%Y-%m-%d}")
+    for campo, etiqueta in (("metodo_pago", "pago"), ("producto", "producto")):
+        valor = filtros.get(campo)
+        if valor and valor != "Todos":
+            partes.append(f"{etiqueta}-{segmento(valor)}")
+
+    marca_tiempo = (ahora or datetime.now().astimezone()).strftime("%Y%m%dT%H%M%S%z")
+    extension = extension.lstrip(".")
+    return f"{'_'.join(partes)}_{marca_tiempo}.{extension}"
 
 
 # ==============================================================================
@@ -210,10 +292,12 @@ def obtener_sesion_db() -> Session:
     return SessionLocal()
 
 
-def cargar_datos_completos() -> Dict[str, pd.DataFrame]:
+def cargar_datos_completos(db: Optional[Session] = None) -> Dict[str, pd.DataFrame]:
     """Carga todas las tablas relacionales y las estructura en DataFrames optimizados."""
-    init_db()
-    db = obtener_sesion_db()
+    cerrar_sesion = db is None
+    if db is None:
+        init_db()
+        db = obtener_sesion_db()
     try:
         # 1. Productos y Presentaciones
         productos = db.query(Producto).all()
@@ -248,7 +332,6 @@ def cargar_datos_completos() -> Dict[str, pd.DataFrame]:
                     "ProductoID": p.id,
                     "GTIN": p.gtin,
                     "Producto": p.nombre,
-                    "Laboratorio": p.laboratorio or "Sin especificar",
                     "TipoPresentacion": pres.tipo.value if hasattr(pres.tipo, "value") else str(pres.tipo),
                     "CantidadPorEnvase": pres.cantidad,
                     "PrecioCosto": costo,
@@ -266,8 +349,6 @@ def cargar_datos_completos() -> Dict[str, pd.DataFrame]:
                 "ProductoID": p.id,
                 "GTIN": p.gtin,
                 "Nombre": p.nombre,
-                "Laboratorio": p.laboratorio or "Sin especificar",
-                "PrincipioActivo": p.principio_activo or "N/A",
                 "TotalStock": total_stock_p,
                 "ValorInventarioCosto": round(valor_costo_p),
                 "ValorInventarioVenta": round(valor_venta_p),
@@ -276,12 +357,12 @@ def cargar_datos_completos() -> Dict[str, pd.DataFrame]:
             })
 
         df_productos = pd.DataFrame(prod_rows) if prod_rows else pd.DataFrame(columns=[
-            "ProductoID", "GTIN", "Nombre", "Laboratorio", "PrincipioActivo",
+            "ProductoID", "GTIN", "Nombre",
             "TotalStock", "ValorInventarioCosto", "ValorInventarioVenta", "TotalPresentaciones", "FechaCreacion"
         ])
 
         df_presentaciones = pd.DataFrame(pres_rows) if pres_rows else pd.DataFrame(columns=[
-            "PresentacionID", "ProductoID", "GTIN", "Producto", "Laboratorio",
+            "PresentacionID", "ProductoID", "GTIN", "Producto",
             "TipoPresentacion", "CantidadPorEnvase", "PrecioCosto", "PrecioVenta",
             "MargenUnitario", "MargenPorcentaje", "StockActual", "StockMinimo",
             "EstadoStock", "ValorTotalCosto", "ValorTotalVenta"
@@ -389,7 +470,8 @@ def cargar_datos_completos() -> Dict[str, pd.DataFrame]:
             "movimientos": df_movimientos,
         }
     finally:
-        db.close()
+        if cerrar_sesion:
+            db.close()
 
 
 # ==============================================================================
@@ -751,6 +833,47 @@ def render_modulo_ventas(datos: Dict[str, pd.DataFrame]):
         fig_metodo.update_layout(template="plotly_white", margin=dict(l=20, r=20, t=40, b=20))
         mostrar_grafica_accesible(fig_metodo, df_metodos, "Ventas por método de pago")
 
+    st.markdown("---")
+    st.subheader("👥 Rendimiento por cajero")
+    rendimiento_cajeros = preparar_rendimiento_cajeros(df_ventas)
+    if rendimiento_cajeros.empty:
+        st.info("No hay datos de cajero para los filtros seleccionados.")
+    else:
+        fig_cajeros = px.bar(
+            rendimiento_cajeros.sort_values("TotalVendido", ascending=True),
+            x="TotalVendido",
+            y="Cajero",
+            orientation="h",
+            title=f"<b>Total vendido por cajero</b> ({MONEDA})",
+            color="TotalVendido",
+            color_continuous_scale="Blues",
+            labels={"TotalVendido": f"Total vendido ({MONEDA})", "Cajero": "Cajero"},
+        )
+        fig_cajeros.update_layout(
+            template="plotly_white",
+            margin=dict(l=20, r=20, t=40, b=20),
+        )
+        mostrar_grafica_accesible(
+            fig_cajeros,
+            rendimiento_cajeros,
+            "Rendimiento de ventas por cajero",
+        )
+        st.dataframe(
+            rendimiento_cajeros,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "TotalVendido": st.column_config.NumberColumn("Total vendido", format=f"{MONEDA}%d"),
+                "TicketPromedio": st.column_config.NumberColumn("Ticket medio", format=f"{MONEDA}%d"),
+                "TicketsPorHora": st.column_config.NumberColumn("Tickets por hora", format="%.2f"),
+            },
+        )
+        st.caption(
+            "La velocidad se estima con las transacciones divididas por el intervalo "
+            "entre la primera y la última venta observada del cajero; con una sola "
+            "venta o sin horas medibles se muestra 0."
+        )
+
     # Top Productos Vendidos
     if not df_items.empty:
         st.markdown("---")
@@ -914,7 +1037,7 @@ def render_modulo_inventario(datos: Dict[str, pd.DataFrame]):
     with st.expander("📋 Ver catálogo completo de presentaciones y precios", expanded=False):
         st.dataframe(
             df_presentaciones[[
-                "GTIN", "Producto", "Laboratorio", "TipoPresentacion", "PrecioCosto",
+                "GTIN", "Producto", "TipoPresentacion", "PrecioCosto",
                 "PrecioVenta", "MargenUnitario", "MargenPorcentaje", "StockActual", "ValorTotalVenta"
             ]],
             use_container_width=True,
@@ -1169,6 +1292,7 @@ def render_explorador_personalizado(datos: Dict[str, pd.DataFrame]):
 def generar_excel_completo(datos: Dict[str, pd.DataFrame]) -> bytes:
     """Genera un archivo Excel con múltiples hojas para Ventas, Inventario y Movimientos."""
     buffer = io.BytesIO()
+    hojas_escritas = 0
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         if not datos["ventas"].empty:
             # Convert tz-aware datetimes to tz-naive if needed
@@ -1176,23 +1300,46 @@ def generar_excel_completo(datos: Dict[str, pd.DataFrame]) -> bytes:
             for col in df_v.select_dtypes(include=["datetime64[ns, UTC]"]).columns:
                 df_v[col] = df_v[col].dt.tz_localize(None)
             df_v.to_excel(writer, sheet_name="Ventas", index=False)
+            hojas_escritas += 1
 
         if not datos["presentaciones"].empty:
             datos["presentaciones"].to_excel(writer, sheet_name="Inventario", index=False)
+            hojas_escritas += 1
 
         if not datos["items"].empty:
             datos["items"].to_excel(writer, sheet_name="Detalle_Ventas", index=False)
+            hojas_escritas += 1
 
         if not datos["movimientos"].empty:
             datos["movimientos"].to_excel(writer, sheet_name="Movimientos", index=False)
+            hojas_escritas += 1
+
+        if hojas_escritas == 0:
+            pd.DataFrame(columns=["Estado"]).to_excel(
+                writer,
+                sheet_name="Resumen",
+                index=False,
+            )
 
     return buffer.getvalue()
 
 
-def render_modulo_exportacion(datos: Dict[str, pd.DataFrame]):
+def render_modulo_exportacion(
+    datos: Dict[str, pd.DataFrame],
+    filtros: Optional[Dict[str, Any]] = None,
+):
     """Permite descargar reportes completos en formato PDF, Excel y CSV."""
     st.subheader("📥 Centro de Exportación de Reportes")
     st.caption("Descarga informes listos para auditorías, contabilidad o análisis externo.")
+    filtros = filtros or {}
+    if filtros:
+        st.caption(
+            "Filtros aplicados: "
+            f"{filtros.get('periodo_opcion', 'Todo el Historial')} · "
+            f"método {filtros.get('metodo_pago', 'Todos')} · "
+            f"producto {filtros.get('producto', 'Todos')}"
+        )
+    ahora = datetime.now().astimezone()
 
     c1, c2, c3, c4 = st.columns(4)
 
@@ -1202,7 +1349,7 @@ def render_modulo_exportacion(datos: Dict[str, pd.DataFrame]):
         st.download_button(
             label="💾 Descargar Libro Excel Completo (.xlsx)",
             data=excel_data,
-            file_name=f"Reporte_General_Inventario_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+            file_name=nombre_archivo_exportacion("Reporte_General_Inventario", "xlsx", filtros, ahora),
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
@@ -1213,7 +1360,7 @@ def render_modulo_exportacion(datos: Dict[str, pd.DataFrame]):
         st.download_button(
             label="💾 Descargar Ventas (.csv)",
             data=csv_ventas,
-            file_name=f"Reporte_Ventas_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            file_name=nombre_archivo_exportacion("Reporte_Ventas", "csv", filtros, ahora),
             mime="text/csv",
             use_container_width=True,
         )
@@ -1224,7 +1371,7 @@ def render_modulo_exportacion(datos: Dict[str, pd.DataFrame]):
         st.download_button(
             label="💾 Descargar Inventario (.csv)",
             data=csv_inventario,
-            file_name=f"Reporte_Inventario_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            file_name=nombre_archivo_exportacion("Reporte_Inventario", "csv", filtros, ahora),
             mime="text/csv",
             use_container_width=True,
         )
@@ -1235,7 +1382,7 @@ def render_modulo_exportacion(datos: Dict[str, pd.DataFrame]):
         st.download_button(
             label="💾 Descargar Reporte (.pdf)",
             data=pdf_data,
-            file_name=f"Reporte_General_Inventario_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+            file_name=nombre_archivo_exportacion("Reporte_General_Inventario", "pdf", filtros, ahora),
             mime="application/pdf",
             use_container_width=True,
         )
@@ -1289,7 +1436,7 @@ def main():
         render_explorador_personalizado(datos_filtrados)
 
     with tab_export:
-        render_modulo_exportacion(datos_filtrados)
+        render_modulo_exportacion(datos_filtrados, filtros)
 
 
 if __name__ == "__main__":

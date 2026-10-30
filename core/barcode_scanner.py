@@ -83,7 +83,7 @@ class BarcodeLector:
         suma = 0
         peso = 3
         
-        for i, digito in enumerate(reversed(codigo_sin_digito)):
+        for digito in reversed(codigo_sin_digito):
             suma += int(digito) * peso
             peso = 3 if peso == 1 else 1
         

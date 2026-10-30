@@ -70,7 +70,7 @@ def test_supplier_product_assignment_dialog_tracks_checked_products():
 
     assert dialogo.productos_seleccionados() == [producto.id]
     assert dialogo.resumen_seleccion.text() == "1 producto(s) seleccionado(s)"
-    dialogo.busqueda.setText("GTIN 100000000004")
+    dialogo.busqueda.setText("Barcode 100000000004")
     assert dialogo.lista_productos.item(0).isHidden()
     assert not dialogo.lista_productos.item(1).isHidden()
     dialogo.close()

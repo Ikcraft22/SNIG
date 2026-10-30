@@ -52,11 +52,14 @@ def test_carrito_modificar_cantidad_y_descuento():
     assert carrito.aplicar_descuento_item(999, 10.0) is False
 
 
-def test_cierre_de_caja_y_metricas_pos(db_session):
+def test_cierre_de_caja_y_metricas_pos(db_session, monkeypatch):
+    from config import settings
+
+    monkeypatch.setattr(settings, "PAGO_TARJETA_HABILITADO", True)
     pos = GestorPOS(db_session)
 
     # Crear producto y presentación con stock
-    prod = Producto(gtin="750000000001", nombre="Producto Test", laboratorio="Lab")
+    prod = Producto(gtin="750000000001", nombre="Producto Test")
     db_session.add(prod)
     db_session.commit()
 
@@ -95,6 +98,12 @@ def test_cierre_de_caja_y_metricas_pos(db_session):
     assert cierre["metodos_pago"]["efectivo"] == 80
     assert cierre["metodos_pago"]["tarjeta"] == 120
     assert cierre["metodos_pago"]["transferencia"] == 40
+    cierre_cajero = pos.obtener_metricas_cierre_caja(hoy, "Cajero1")
+    assert cierre_cajero["total_ingresos"] == 200
+    assert cierre_cajero["cantidad_ventas"] == 2
+    assert pos.obtener_resumen_por_cajero(hoy, "Cajero2") == {
+        "Cajero2": {"total": 40, "cantidad": 1}
+    }
 
     # Resumen por cajero
     por_cajero = pos.obtener_resumen_por_cajero()
@@ -104,6 +113,19 @@ def test_cierre_de_caja_y_metricas_pos(db_session):
     assert "Cajero2" in por_cajero
     assert por_cajero["Cajero2"]["total"] == 40
     assert por_cajero["Cajero2"]["cantidad"] == 1
+    assert pos.obtener_resumen_por_cajero(hoy)["Cajero1"]["cantidad"] == 2
+    assert pos.obtener_resumen_por_cajero(hoy)["Cajero2"]["cantidad"] == 1
+
+    db_session.add(Venta(
+        numero_ticket="TK-20200101-000001",
+        total=999,
+        usuario="CajeroAntiguo",
+        metodo_pago="efectivo",
+        fecha=datetime(2020, 1, 1, 10, 0),
+    ))
+    db_session.commit()
+    assert "CajeroAntiguo" not in pos.obtener_resumen_por_cajero(hoy)
+    assert pos.obtener_resumen_por_cajero()["CajeroAntiguo"]["total"] == 999
 
     # Rango de fechas
     ventas_rango = pos.obtener_ventas_rango(hoy, hoy)

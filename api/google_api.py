@@ -5,7 +5,7 @@ Proporciona funciones avanzadas de búsqueda.
 
 import requests
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from config.settings import GOOGLE_API_KEY, GOOGLE_SEARCH_ENGINE_ID
 
 logger = logging.getLogger(__name__)

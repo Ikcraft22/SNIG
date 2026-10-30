@@ -13,7 +13,6 @@ __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
-*.pyw
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -28,9 +27,11 @@ htmlcov/
 .env.*
 .env.local
 .env.production
-*.local
 secrets.json
 secrets.yaml
+# Permitir plantillas de configuración sin secretos.
+!.env.example
+!.env.*.example
 
 # ── Base de datos y archivos de datos locales ────────────────
 *.db
@@ -38,6 +39,10 @@ secrets.yaml
 *.sqlite3
 *.db-shm
 *.db-wal
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3-shm
+*.sqlite3-wal
 backups/
 
 # ── Logs ─────────────────────────────────────────────────────
@@ -51,20 +56,16 @@ logs/
 *.tmp
 *.temp
 
-# ── Binarios e iconos grandes (no necesarios en repo) ────────
-*.af
-*.rar
-*.zip
-*.tar.gz
-# Mantener Logo.svg (vectorial, liviano) pero ignorar binarios pesados
-Logo.ico
-Logo.af
+# ── Recursos del proyecto ────────────────────────────────────
+# Logo.ico e Icono.jpeg son requeridos por la GUI y el build.
+# Mantener fuera el icono legado y el archivo de trabajo redundante.
 Icono.ico
-Icono.jpeg
-Icono.webp
+/Logo.af
 
 # ── IDE / Editores ───────────────────────────────────────────
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
 .idea/
 *.suo
 *.user
@@ -86,10 +87,9 @@ dist/
 *.egg-info/
 *.egg
 MANIFEST
-site/
 
-# ── PyInstaller ──────────────────────────────────────────────
-*.spec
+# Las especificaciones *.spec son configuración fuente de PyInstaller
+# y se versionan junto con el código.
 
 # ── Reportes y exportaciones generadas ──────────────────────
 exports/

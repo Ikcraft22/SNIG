@@ -1,6 +1,6 @@
 # Documentación completa del sistema
 
-Fecha de actualización: 23 de octubre de 2026
+Fecha de actualización: 26 de octubre de 2026
 Versión: 1.2.0
 Estado: funcional
 
@@ -9,6 +9,8 @@ Estado: funcional
 Este proyecto implementa un sistema de inventario y punto de venta para comercios minoristas. Está diseñado para funcionar localmente con SQLite por defecto y ofrece una interfaz gráfica moderna y táctil basada en PyQt5, un dashboard avanzado de analítica interactiva con Streamlit y Plotly, además de una capa web con Flask.
 
 ## 2. Objetivos del sistema
+
+En las pantallas, el código se muestra con el rótulo **Barcode**. Cuando esta documentación lo explica, usa **Barcode (GTIN)** para relacionarlo con el nombre técnico; el atributo y las claves de integración existentes conservan `gtin`.
 
 El sistema permite:
 
@@ -62,8 +64,9 @@ La GUI de escritorio presenta un panel principal y navegación lateral:
 
 - **Inicio**: resumen de productos, unidades en stock, valorización y alertas, además de accesos rápidos.
 - **📦 Inventario**: Catálogo con búsqueda, stock, precios, proveedor y acciones rápidas.
-- **🛒 POS**: Punto de venta con escaneo de GTIN, carrito interactivo y cobro con Efectivo o Transferencia.
+- **🛒 POS**: Punto de venta con escaneo de Barcode (GTIN), carrito interactivo y cobro con Efectivo o Transferencia.
 - **📊 Reportes**: Resumen de indicadores y botón directo `🚀 Abrir Dashboard Gráfico en Streamlit`.
+- **🧾 Arqueo / Cierre de Caja**: Resumen por fecha de ingresos, transacciones, ticket promedio, cajeros y métodos de pago; exportable a PDF.
 - **🏭 Proveedores**: Altas, edición, eliminación y asignación de productos a proveedores.
 - **📝 Logs**: Registro de actividad del sistema, oculto hasta solicitarlo.
 
@@ -72,6 +75,26 @@ Incluye interruptor animado de tema Día / Noche con persistencia automática en
 Los formularios de producto, proveedor y asignación de productos incluyen textos de ayuda, campos de búsqueda cuando corresponde, validación y apariencia compatible con el tema activo. En la tabla de inventario, la columna **Proveedor** muestra los proveedores asociados o **Sin proveedor**. Eliminar un proveedor no elimina sus productos.
 
 El pago se puede seleccionar con botones o mediante las teclas **1** (Efectivo) y **2** (Transferencia).
+
+El botón **📄 Descargar / Ver Reporte PDF** en Reportes genera un archivo con ventas, inventario, detalle de ventas y movimientos desde la base activa y lo abre con el visor predeterminado. Las alertas del icono de bandeja se comprueban cada 15 minutos por defecto (`ALERTA_STOCK_INTERVALO_MINUTOS` en `.env`, mínimo 1). Al abrir una alerta, la GUI navega al inventario filtrado.
+
+#### Estado temporal de autenticación y usuarios
+
+Se omite temporalmente el panel de inicio de sesión. También están desactivados la sección **Usuarios**, el cambio de usuario y las restricciones por rol. La aplicación de escritorio abre directamente y las secciones funcionales quedan disponibles. No se borran cuentas, hashes de contraseña, la columna `usuarios.password_hash` ni el código de autenticación; la migración de la base existente sigue siendo aditiva y conserva sus registros.
+
+Para reactivar las funciones, cambia `AUTENTICACION_HABILITADA = False` a `AUTENTICACION_HABILITADA = True` en `config/settings.py` y reinicia SNIG. Aparecerán de nuevo el diálogo de acceso, la administración de usuarios, el cambio de usuario y los permisos por rol; `python init_db.py` también ofrecerá configurar el administrador inicial. Si usas el ejecutable de Windows, vuelve a generar el build con `python -m PyInstaller --noconfirm --clean SNIG.spec` y distribuye esa carpeta/ZIP actualizado. También puedes crear el administrador desde consola con `python -m core.auth --crear-admin Administrador`. Las contraseñas se almacenan como hashes PBKDF2-SHA256 con salt aleatorio.
+
+#### Estado temporal del pago con tarjeta
+
+El cobro con tarjeta está desactivado en GUI, terminal, web y API mediante `PAGO_TARJETA_HABILITADO = False` en `config/settings.py`. Además de ocultar la opción en las interfaces, el gestor de ventas y el checkout web rechazan nuevas ventas con tarjeta. Los registros históricos no se modifican y permanecen disponibles en reportes y cierres de caja.
+
+Para reactivar el método, cambia `PAGO_TARJETA_HABILITADO = False` a `PAGO_TARJETA_HABILITADO = True` en `config/settings.py` y reinicia la aplicación; el método volverá a estar disponible en las interfaces y validaciones. Si se usa el ejecutable de Windows, genera y distribuye un build actualizado.
+
+Al activarse, los roles de GUI son:
+
+- **Cajero**: Inicio, POS y resumen/cierre de sus propias ventas.
+- **Inventario**: Inicio, Inventario y Proveedores.
+- **Admin**: acceso completo, métricas financieras, reportes, registros y administración de usuarios.
 
 ### 4.3 Módulo de Reportes y Analítica (Streamlit + Plotly)
 
@@ -86,17 +109,27 @@ Ubicado en `reporting/streamlit_reports.py`, provee:
   - *Treemaps (Mapas de árbol)* (jerarquía de valor e inventario).
   - *Dispersión (Scatter), Diagramas de Cajas (Box Plots) e Histogramas* en el Explorador Gráfico Personalizado.
 - **Pestañas de Reportes**:
-  1. *📈 Ventas & Facturación*: Tendencias temporales, desglose por método de pago, ranking top 10 y visor de transacciones.
+  1. *📈 Ventas & Facturación*: Tendencias temporales, desglose por método de pago, rendimiento por cajero (ventas, transacciones, ticket medio y velocidad por hora observada), ranking top 10 y visor de transacciones.
   2. *📦 Inventario & Stock*: Existencias, valorización del almacén y semáforo de alerta crítica.
   3. *🔄 Movimientos & Kardex*: Auditoría histórica de Entradas, Salidas y Ajustes.
   4. *🎨 Explorador Gráfico Personalizado (Custom Chart Studio)*: Permite al usuario cruzar cualquier dimensión y métrica, y escoger libremente el tipo de gráfica a renderizar.
-  5. *📥 Centro de Exportación*: Generación y descarga de reportes PDF, libro Excel (`.xlsx`) multitabla y archivos `.csv`.
+  5. *📥 Centro de Exportación*: Generación y descarga de reportes PDF, libro Excel (`.xlsx`) multitabla y archivos `.csv`; usa los filtros activos y nombres con timestamp ISO seguro.
 
 ### 4.4 Interfaz web (Flask)
 
 La web se ejecuta con Flask (`web/app.py`) y ofrece acceso HTTP a distintos endpoints y vistas del sistema, incluyendo enlace directo al servidor Streamlit.
 
+El formulario Web de Reportes permite descargar PDF, Excel multitabla o CSV (ventas, inventario, productos, detalle o movimientos), aplicando fechas inclusivas, método de pago y producto. La API equivalente es `GET /api/reportes/exportar?formato=pdf|xlsx|csv`; para CSV se puede especificar `dataset=ventas|presentaciones|productos|items|movimientos`.
+
 Las interfaces web incorporan enlace para saltar al contenido, estructura semántica, etiquetas de formulario y anuncios de estado, además de foco visible, soporte de movimiento reducido y controles de tema operables por teclado. El dashboard de Streamlit conserva alternativas tabulares para las gráficas y foco visible; la GUI Qt expone nombres y descripciones accesibles y resaltado de foco. Son mejoras de accesibilidad, no una certificación formal WCAG.
+
+#### Estado de sincronización entre sucursales
+
+La API dispone de `GET /api/sync/cursor` y `GET /api/sync/changes?cursor=<entero>&limit=<1-500>`. El feed ordena los cambios locales de `Producto`, `Presentacion`, `MovimientoInventario`, `Venta` y `VentaItem`, y devuelve upserts y eliminaciones con un cursor incremental. Es una API de lectura de eventos, no una solución de sincronización multi-sucursal. Ambas rutas exigen `Authorization: Bearer <SYNC_API_TOKEN>`; si `SYNC_API_TOKEN` no está configurado, responden `503` y permanecen desactivadas.
+
+Configura un token aleatorio y privado en `SYNC_API_TOKEN` en el servidor y en los clientes autorizados. No lo guardes en el repositorio ni lo envíes por canales sin cifrar; usa HTTPS al acceder al servidor desde una red.
+
+No se implementa todavía la toma de una instantánea inicial, envío de cambios locales, identidad de sucursal, idempotencia/origen de eventos, aplicación de cambios remotos sin volver a emitirlos ni resolución `last-write-wins`. Tampoco se incluyen proveedores o usuarios en el feed. El cursor es una secuencia de una sola base y no debe tratarse como identificador global entre nodos. El cliente multi-sucursal sigue pendiente; antes de activarlo se requieren pruebas de reconciliación entre nodos y definir la política operativa ante conflictos, borrados y caídas de conectividad.
 
 ## 5. Configuración
 
@@ -119,6 +152,8 @@ MYSQL_USER=root
 MYSQL_PASSWORD=
 MYSQL_DATABASE=inventario_general
 ```
+
+También se puede establecer una URL SQLAlchemy completa con `DATABASE_URL`; cuando está definida, prevalece sobre `DB_ENGINE` y las opciones específicas de SQLite/MySQL. El pool hace una comprobación previa de conexiones (`pool_pre_ping`), pero no existe un modo offline automático ni una resincronización de escrituras tras una caída del servidor.
 
 ## 6. Ejecución
 
@@ -234,7 +269,7 @@ pip install flask
 
 ---
 
-Última actualización: 23 de octubre de 2026
+Última actualización: 26 de octubre de 2026
 Versión actual: 1.2.0
 # APIs (Opcional)
 GOOGLE_API_KEY=                    # Obtén desde Google Cloud Console
@@ -261,8 +296,8 @@ Este script:
 - Valida el entorno
 - Verifica dependencias
 - Crea todas las tablas
-- Crea usuario administrador
-- Opcionalmente carga datos de prueba
+- Omite la configuración de usuarios mientras la autenticación esté desactivada
+- Opcionalmente carga datos de prueba (no borra datos existentes)
 
 ### 9. ¡Ejecutar la Aplicación!
 
@@ -270,20 +305,19 @@ Este script:
 python main.py
 ```
 
-Selecciona tu interfaz preferida:
-```
-1. 💻 Terminal (CLI)
-2. 🖥️  Interfaz Gráfica (GUI)
-3. 🌐 Web (Flask)
-4. ⚙️  Configuración
-5. 🚪 Salir
+La GUI de escritorio se abre directamente. Para iniciar otras interfaces, ejecuta desde la raíz:
+
+```bash
+python -m ui.terminal_ui
+python main.py --reportes
+python -m web.app
 ```
 
 ---
 
 ## Guía de Uso
 
-### Interfaz Terminal (Opción 1)
+### Interfaz Terminal
 
 #### Menú Principal
 ```
@@ -297,21 +331,21 @@ Selecciona tu interfaz preferida:
 #### Gestión de Inventario
 **Registrar nuevo producto:**
 1. Selecciona opción 1 → 1
-2. Escanea o ingresa GTIN
+2. Escanea o ingresa Barcode (GTIN)
 3. Completa información del producto
-4. Agrega presentaciones (tableta, ampolla, etc.)
+4. Agrega presentaciones (unidad, bolsa o botella)
 5. Establece precio de costo y venta
 6. Define stock inicial
 
 **Buscar producto:**
 1. Selecciona opción 1 → 2
-2. Escanea GTIN
+2. Escanea Barcode (GTIN)
 3. Sistema muestra información completa
 4. Ver stock de cada presentación
 
 **Registrar entrada de stock:**
 1. Selecciona opción 1 → 3
-2. Escanea GTIN del producto
+2. Escanea el Barcode (GTIN) del producto
 3. Selecciona presentación
 4. Ingresa cantidad
 5. Ingresa razón (factura, compra, etc.)
@@ -319,7 +353,7 @@ Selecciona tu interfaz preferida:
 
 **Registrar salida de stock:**
 1. Selecciona opción 1 → 4
-2. Escanea GTIN del producto
+2. Escanea el Barcode (GTIN) del producto
 3. Selecciona presentación
 4. Ingresa cantidad a salir
 5. Ingresa razón del movimiento
@@ -356,7 +390,7 @@ Selecciona tu interfaz preferida:
 5. Productos sin stock
 6. Productos en alerta
 
-### Interfaz Gráfica (Opción 2)
+### Interfaz Gráfica
 
 **Características visuales:**
 - Ventana principal con pestañas
@@ -372,11 +406,11 @@ Selecciona tu interfaz preferida:
 5. El carrito se actualiza en tiempo real
 6. Ver botones de acción para cada operación
 
-### Interfaz Web (Opción 3)
+### Interfaz Web
 
 **Acceso:**
 ```
-Abre en tu navegador: http://localhost:5000
+Inicia el servidor con `python -m web.app` y abre: http://localhost:5000
 ```
 
 **Páginas disponibles:**
@@ -495,7 +529,7 @@ Integraciones:
 **Modelos:**
 ```python
 - Producto: artículos del catálogo
-- Presentacion: tabletas, ampollas, etc.
+- Presentacion: unidad, bolsa o botella
 - MovimientoInventario: entrada/salida/ajuste
 - Venta: tickets de caja
 - VentaItem: items dentro de una venta
@@ -576,14 +610,14 @@ gestor = GestorInventario(db)
 # Registrar producto
 producto = gestor.registrar_producto(
     gtin='7501001234567',
-    nombre='Paracetamol 500mg',
-    laboratorio='Lab Genérico'
+    nombre='Cuaderno profesional',
+    descripcion='Cuaderno de 100 hojas'
 )
 
 # Agregar presentación
 presentacion = gestor.agregar_presentacion(
     producto_id=producto.id,
-    tipo_presentacion='tableta',
+    tipo_presentacion='unidad',
     cantidad=1,
     precio_unitario=100,
     precio_venta=250,
@@ -699,7 +733,7 @@ GET  /api/ventas                # Listar ventas
 GET  /api/ventas/reporte/<fecha> # Reporte de ventas
 ```
 
-Para preparar un cliente móvil, consulta primero `/api/sync/cursor`, descarga el catálogo usando `/api/productos?page=...&per_page=...` y luego consume `/api/sync/changes` desde ese cursor. Persiste `next_cursor` solo después de aplicar los cambios recibidos. El feed devuelve eventos `upsert`/`delete` para productos, presentaciones, movimientos, ventas y sus detalles en orden transaccional. Esta primera fase permite sincronización incremental de lectura; todavía no acepta escrituras móviles, autenticación ni resolución distribuida de conflictos.
+El feed `/api/sync/cursor` y `/api/sync/changes` solo permite consultar eventos locales y requiere el token `SYNC_API_TOKEN`. No hay un cliente de sincronización móvil implementado ni una toma de estado inicial; tampoco se aceptan escrituras móviles ni resolución distribuida de conflictos.
 
 ---
 
@@ -725,10 +759,9 @@ Para preparar un cliente móvil, consulta primero `/api/sync/cursor`, descarga e
 {
   "status": 1,
   "product": {
-    "product_name": "Paracetamol 500mg",
-    "brands": "Laboratorio Genérico",
-    "ingredients_text": "Paracetamol...",
-    "categories": "Productos"
+    "product_name": "Galletas de avena",
+    "ingredients_text": "Avena, harina y azúcar",
+    "categories": "Snacks"
   }
 }
 ```
@@ -772,12 +805,8 @@ GOOGLE_SEARCH_ENGINE_ID=tu_id_motor
 ```sql
 id (PRIMARY KEY)
 gtin (UNIQUE INDEX)
-cum
 nombre (INDEX)
 descripcion
-principio_activo
-laboratorio
-registro_sanitario
 fecha_creacion
 fecha_actualizacion
 ```
@@ -1003,28 +1032,17 @@ if info['encontrado']:
     producto = gestor.registrar_producto(
         gtin='7501001234567',
         nombre=info['datos']['nombre'],
-        laboratorio=info['datos'].get('marca'),
         descripcion=info['datos'].get('descripcion')
     )
     
-    # Agregar presentación (Tableta 500mg)
-    pres_tableta = gestor.agregar_presentacion(
+    # Agregar presentación por unidad
+    pres_unidad = gestor.agregar_presentacion(
         producto_id=producto.id,
-        tipo_presentacion='tableta',
+        tipo_presentacion='unidad',
         cantidad=1,
         precio_unitario=150,      # Precio de costo
         precio_venta=350,         # Precio de venta
         stock_inicial=50
-    )
-    
-    # Agregar presentación (Ampolla 10ml)
-    pres_ampolla = gestor.agregar_presentacion(
-        producto_id=producto.id,
-        tipo_presentacion='ampolla',
-        cantidad=1,
-        precio_unitario=500,
-        precio_venta=1200,
-        stock_inicial=20
     )
     
     print(f"✅ Producto registrado: {producto.nombre}")
@@ -1284,14 +1302,11 @@ while True:
 
 ### ¿Se pueden agregar más usuarios?
 
-**Sí.** En `database/models.py` ya existe tabla `usuarios` con roles.
+**Sí.** La tabla `usuarios` y el flujo de gestión existen, pero están desactivados temporalmente. Consulta la sección «Estado temporal de autenticación y usuarios» para reactivarlos.
 
 ### ¿Cómo limitar acceso por usuario?
 
-**Agregar sistema de login:**
-1. Modificar `main.py` para pedir login
-2. Verificar usuario en BD
-3. Pasar usuario a interfaces
+Activa la autenticación cambiando `AUTENTICACION_HABILITADA = False` a `True` en `config/settings.py`. El login y los roles ya están implementados; no es necesario volver a crearlos.
 
 ### ¿Puedo integrar más APIs?
 
@@ -1310,18 +1325,17 @@ class ProductosAPI:
 
 ## Roadmap Futuro
 
-### v1.1.0 - Autenticación (Próxima)
-- [ ] Sistema de login seguro
-- [ ] Roles avanzados (admin, cajero, inventario)
+### v1.1.0 - Autenticación (implementada, temporalmente desactivada)
+- [x] Sistema de login seguro y roles (admin, cajero, inventario); ver la sección de estado temporal para reactivarlos.
 - [ ] Auditoría de acciones
 - [ ] Historial de accesos
 
 ### v1.2.0 - Reportes Avanzados
 - [x] Exportación a PDF
-- [ ] Exportación a Excel
-- [ ] Gráficas estadísticas
+- [x] Exportación a Excel
+- [x] Gráficas estadísticas
 - [ ] Predicción de stock
-- [ ] Análisis de ventas
+- [x] Análisis de ventas
 
 ### v1.3.0 - Integración Móvil
 - [ ] App móvil (React Native)
@@ -1330,7 +1344,7 @@ class ProductosAPI:
 - [ ] Modo offline
 
 ### v2.0.0 - Sistema Completo
-- [ ] Gestión de proveedores
+- [x] Gestión de proveedores
 - [ ] Órdenes de compra automáticas
 - [ ] Control de lotes y vencimiento
 - [ ] Integración con código QR
@@ -1381,13 +1395,13 @@ Esta versión incorpora mejoras exponenciales al núcleo del sistema: búsqueda 
 
 #### 12.1 `buscar_productos(termino: str) -> list[Producto]`
 
-Búsqueda inteligente multi-criterio. Busca el término (insensible a mayúsculas) en los campos `nombre`, `gtin`, `laboratorio`, `descripcion` y `principio_activo` simultáneamente usando `OR` de SQL. Devuelve una lista de productos que coinciden con cualquiera de los criterios.
+Búsqueda inteligente multi-criterio. Busca el término (insensible a mayúsculas) en los campos `nombre`, `gtin` y `descripcion` usando `OR` de SQL. Devuelve una lista de productos que coinciden con cualquiera de los criterios.
 
 ```python
 from core.inventory_manager import InventarioManager
 inv = InventarioManager(session)
 resultados = inv.buscar_productos("vitamina")
-# → lista de Producto con nombre/gtin/laboratorio/descripcion/principio_activo que contengan "vitamina"
+# → lista de productos cuyo nombre, Barcode o descripción contengan "cuaderno"
 ```
 
 **Uso en GUI:** La barra de búsqueda del panel Inventario ahora usa esta función al presionar Enter, mostrando resultados multi-coincidencia en lugar de solo búsqueda exacta por GTIN.
@@ -1442,7 +1456,7 @@ Detecta automáticamente qué productos están al límite crítico de stock. Dev
 
 Exporta el catálogo completo de productos y sus presentaciones a un archivo CSV con los encabezados:
 
-`producto_id, producto_nombre, gtin, laboratorio, presentacion_id, presentacion_nombre, precio_costo, precio_venta, stock_actual, stock_minimo, stock_maximo`
+`producto_id, producto_nombre, gtin, presentacion_id, presentacion_nombre, precio_costo, precio_venta, stock_actual, stock_minimo, stock_maximo`
 
 ```python
 inv.exportar_catalogo_csv("catalogo_octubre_2026.csv")
@@ -1616,8 +1630,8 @@ curl "http://localhost:5000/api/pos/cierre-caja?fecha=2026-10-18"
 
 #### 16.1 Búsqueda multi-criterio
 
-- El campo GTIN/búsqueda ahora tiene placeholder: `"Buscar por nombre, GTIN, laboratorio..."`
-- Al presionar **Enter** en ese campo se llama a `buscar_productos(termino)` mostrando todos los resultados que coincidan con nombre, GTIN, laboratorio, descripción o principio activo.
+- El campo Barcode/búsqueda permite buscar por nombre, Barcode o descripción.
+- Al presionar **Enter** en ese campo se llama a `buscar_productos(termino)` y muestra todos los resultados coincidentes.
 
 #### 16.2 Botón "📥 Exportar Catálogo"
 
@@ -1651,7 +1665,7 @@ Margen promedio:  37.2%
 
 ### 17. Pruebas automatizadas
 
-La suite cubre inventario y POS, API web, reportes y la interfaz gráfica. Incluye pruebas de las relaciones proveedor-producto, asignación de productos, columna de proveedores y formularios adaptados al tema.
+La suite cubre inventario y POS, API web, reportes, búsqueda por Barcode y la interfaz gráfica y de terminal. Incluye pruebas de errores de API, importación/exportación, filtros, gráficas del dashboard, relaciones proveedor-producto y formularios adaptados al tema.
 
 Ejecutar todos los tests:
 
@@ -1659,13 +1673,23 @@ Ejecutar todos los tests:
 python -m pytest
 ```
 
+Medir el umbral de cobertura sobre código de producción (requiere `coverage` instalado):
+
+```bash
+python -m coverage erase
+python -m coverage run -m pytest -q
+python -m coverage report --include='api/*.py,config/*.py,core/*.py,database/*.py,reporting/*.py,ui/*.py,web/*.py' --fail-under=80
+```
+
+La medición excluye archivos de prueba y usa el mismo alcance de módulos en todas las ejecuciones.
+
 ---
 
 ## Agradecimientos
 
 - [opensource-coding/Dark-Light-Mode-Switch](https://github.com/opensource-coding/Dark-Light-Mode-Switch) — componente de interruptor de modo oscuro/claro integrado en la interfaz web del proyecto.
 
-**Última actualización**: 23 de octubre de 2026
+**Última actualización**: 26 de octubre de 2026
 **Versión**: 1.2.0
 **Estado**: Producción  
 **Autor**: GitHub Copilot

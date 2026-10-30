@@ -15,34 +15,56 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime
 import random
+from sqlalchemy.exc import SQLAlchemyError
 
 try:
     from PyQt5.QtWidgets import (
         QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
         QPushButton, QLabel, QLineEdit, QTableWidget, QTableWidgetItem,
         QComboBox, QSpinBox, QDoubleSpinBox, QDialog, QDialogButtonBox,
-            QInputDialog, QAction, QMenu,
-        QMessageBox, QTabWidget, QListWidget, QListWidgetItem,
+            QInputDialog, QAction, QMenu, QDateEdit,
+            QMessageBox, QTabWidget, QListWidget, QListWidgetItem, QFileDialog,
+            QSystemTrayIcon,
         QPlainTextEdit, QSplitter, QStatusBar, QFormLayout, QStackedWidget,
             QSizePolicy, QHeaderView, QSlider, QFrame, QGridLayout, QButtonGroup
     )
-    from PyQt5.QtCore import Qt, QSize, QTimer, QEvent
-    from PyQt5.QtGui import QIcon, QFont, QColor, QPixmap
+    from PyQt5.QtCore import Qt, QSize, QTimer, QEvent, QUrl, QDate
+    from PyQt5.QtGui import QIcon, QFont, QColor, QPixmap, QDesktopServices
     PYQT5_AVAILABLE = True
 except ImportError:
     PYQT5_AVAILABLE = False
     print("⚠️ PyQt5 no está instalado. Use: pip install PyQt5")
 
 from database.connection import SessionLocal, init_db
-from database.models import Producto, Proveedor
+from database.models import (
+    MovimientoInventario,
+    Presentacion,
+    Producto,
+    Proveedor,
+    Venta,
+    VentaItem,
+    Usuario,
+)
+from core.auth import (
+    PASSWORD_MIN_LENGTH,
+    crear_administrador_inicial,
+    crear_usuario,
+    hash_password,
+    verificar_password,
+)
 from core.barcode_scanner import EscanerProducto
 from core.inventory_manager import GestorInventario
 from core.pos_manager import GestorPOS, calcular_vuelto
-from config.settings import PRESENTACIONES, MONEDA
+from config.settings import (
+    ALERTA_STOCK_INTERVALO_MINUTOS,
+    AUTENTICACION_HABILITADA,
+    obtener_metodos_pago_disponibles,
+    PRESENTACIONES,
+    MONEDA,
+)
 from ui.switch_dia_noche import SwitchDiaNoche
 
 logger = logging.getLogger(__name__)
-
 
 def formatear_numero(valor, decimales=0):
     """Devuelve el número con separador de miles en formato latino."""
@@ -104,6 +126,199 @@ class QtLogHandler(logging.Handler):
         if self.widget is not None:
             self.widget.appendPlainText(msg)
 
+class DialogoLogin(QDialog):
+    """Inicio de sesión o configuración controlada del primer administrador."""
+
+    def __init__(self, db, parent=None):
+        super().__init__(parent)
+        self.db = db
+        self.usuario = None
+        self.usuarios = (
+            db.query(Usuario)
+            .filter(Usuario.activo.is_(True), Usuario.password_hash.isnot(None))
+            .order_by(Usuario.nombre)
+            .all()
+        )
+        self.configuracion_inicial = not self.usuarios
+        self.setWindowTitle("Acceso a SNIG")
+        self.setModal(True)
+        self.resize(390, 250)
+
+        layout = QVBoxLayout(self)
+        titulo = QLabel(
+            "Configura el administrador inicial" if self.configuracion_inicial else "Iniciar sesión"
+        )
+        titulo.setStyleSheet("font-size: 19px; font-weight: bold;")
+        layout.addWidget(titulo)
+
+        formulario = QFormLayout()
+        self.selector_usuario = None
+        self.entrada_nombre = None
+        if self.configuracion_inicial:
+            self.entrada_nombre = QLineEdit("Administrador")
+            self.entrada_nombre.setAccessibleName("Nombre del administrador inicial")
+            formulario.addRow("Nombre:", self.entrada_nombre)
+        else:
+            self.selector_usuario = QComboBox()
+            for usuario in self.usuarios:
+                self.selector_usuario.addItem(
+                    f"{usuario.nombre} · {usuario.rol.capitalize()}",
+                    usuario.id,
+                )
+            self.selector_usuario.setAccessibleName("Usuario")
+            formulario.addRow("Usuario:", self.selector_usuario)
+
+        self.entrada_password = QLineEdit()
+        self.entrada_password.setEchoMode(QLineEdit.Password)
+        self.entrada_password.setAccessibleName("Contraseña")
+        self.entrada_password.setPlaceholderText("Mínimo 12 caracteres")
+        formulario.addRow("Contraseña:", self.entrada_password)
+        self.entrada_confirmacion = None
+        if self.configuracion_inicial:
+            self.entrada_confirmacion = QLineEdit()
+            self.entrada_confirmacion.setEchoMode(QLineEdit.Password)
+            self.entrada_confirmacion.setAccessibleName("Confirmar contraseña")
+            self.entrada_confirmacion.setPlaceholderText("Repite la contraseña")
+            formulario.addRow("Confirmación:", self.entrada_confirmacion)
+        layout.addLayout(formulario)
+
+        botones = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+        )
+        botones.button(QDialogButtonBox.Ok).setText(
+            "Crear administrador" if self.configuracion_inicial else "Entrar"
+        )
+        botones.accepted.connect(self._autenticar)
+        botones.rejected.connect(self.reject)
+        layout.addWidget(botones)
+        self.entrada_password.returnPressed.connect(self._autenticar)
+
+    def _autenticar(self):
+        password = self.entrada_password.text()
+        if self.configuracion_inicial:
+            nombre = self.entrada_nombre.text().strip()
+            if len(password) < PASSWORD_MIN_LENGTH:
+                QMessageBox.warning(
+                    self,
+                    "Contraseña insuficiente",
+                    f"Usa al menos {PASSWORD_MIN_LENGTH} caracteres.",
+                )
+                return
+            if password != self.entrada_confirmacion.text():
+                QMessageBox.warning(self, "Contraseña distinta", "Las contraseñas no coinciden.")
+                return
+            try:
+                self.usuario = crear_administrador_inicial(self.db, nombre, password)
+            except ValueError as error:
+                QMessageBox.critical(self, "No se pudo configurar el administrador", str(error))
+                return
+        else:
+            usuario_id = self.selector_usuario.currentData()
+            usuario = next((item for item in self.usuarios if item.id == usuario_id), None)
+            if usuario is None or not verificar_password(password, usuario.password_hash):
+                QMessageBox.warning(self, "Acceso denegado", "Usuario o contraseña incorrectos.")
+                self.entrada_password.clear()
+                return
+            self.usuario = usuario
+        self.accept()
+
+
+class DialogoUsuario(QDialog):
+    """Alta y edición de cuentas desde la sesión administradora."""
+
+    def __init__(self, db, usuario=None, parent=None):
+        super().__init__(parent)
+        self.db = db
+        self.usuario = usuario
+        self.setWindowTitle("Editar usuario" if usuario else "Nuevo usuario")
+        self.setModal(True)
+
+        layout = QVBoxLayout(self)
+        formulario = QFormLayout()
+        self.entrada_nombre = QLineEdit(usuario.nombre if usuario else "")
+        formulario.addRow("Nombre:", self.entrada_nombre)
+        self.entrada_email = QLineEdit(usuario.email or "" if usuario else "")
+        formulario.addRow("Correo:", self.entrada_email)
+        self.selector_rol = QComboBox()
+        self.roles = [("Administrador", "admin"), ("Inventario", "inventario"), ("Cajero", "cajero")]
+        for etiqueta, valor in self.roles:
+            self.selector_rol.addItem(etiqueta, valor)
+        if usuario:
+            indice = self.selector_rol.findData(usuario.rol)
+            if indice >= 0:
+                self.selector_rol.setCurrentIndex(indice)
+        formulario.addRow("Rol:", self.selector_rol)
+        self.entrada_password = QLineEdit()
+        self.entrada_password.setEchoMode(QLineEdit.Password)
+        self.entrada_password.setPlaceholderText(
+            f"Obligatoria, mínimo {PASSWORD_MIN_LENGTH} caracteres"
+            if usuario is None
+            else "Déjala vacía para conservar la contraseña"
+        )
+        formulario.addRow("Contraseña:", self.entrada_password)
+        layout.addLayout(formulario)
+
+        botones = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        botones.accepted.connect(self._guardar)
+        botones.rejected.connect(self.reject)
+        layout.addWidget(botones)
+
+    def _guardar(self):
+        nombre = self.entrada_nombre.text().strip()
+        correo = self.entrada_email.text().strip() or None
+        rol = self.selector_rol.currentData()
+        password = self.entrada_password.text()
+        if not nombre:
+            QMessageBox.warning(self, "Nombre requerido", "Especifica un nombre de usuario.")
+            return
+        if self.usuario is None and len(password) < PASSWORD_MIN_LENGTH:
+            QMessageBox.warning(
+                self,
+                "Contraseña insuficiente",
+                f"Usa al menos {PASSWORD_MIN_LENGTH} caracteres.",
+            )
+            return
+        if (
+            self.usuario is not None
+            and self.usuario.activo
+            and self.usuario.rol == "admin"
+            and rol != "admin"
+            and self.db.query(Usuario).filter(
+                Usuario.activo.is_(True),
+                Usuario.rol == "admin",
+                Usuario.id != self.usuario.id,
+            ).count() == 0
+        ):
+            QMessageBox.warning(self, "Acción no permitida", "Debe permanecer al menos un administrador activo.")
+            return
+
+        try:
+            if self.usuario is None:
+                self.usuario = crear_usuario(self.db, nombre, rol, password, correo)
+            else:
+                self.usuario.nombre = nombre
+                self.usuario.email = correo
+                self.usuario.rol = rol
+                if password:
+                    self.usuario.password_hash = hash_password(password)
+                self.db.commit()
+                self.db.refresh(self.usuario)
+        except ValueError as error:
+            self.db.rollback()
+            QMessageBox.warning(self, "Datos de usuario inválidos", str(error))
+            return
+        except SQLAlchemyError as error:
+            self.db.rollback()
+            logger.exception("No se pudo guardar el usuario")
+            QMessageBox.critical(
+                self,
+                "Error al guardar usuario",
+                f"No se guardaron los cambios:\n{error}",
+            )
+            return
+        self.accept()
+
+
 class InterfazGUI:
     """Interfaz Gráfica del Sistema de Inventario"""
     
@@ -113,28 +328,289 @@ class InterfazGUI:
             raise ImportError("PyQt5 es requerido para la interfaz gráfica")
         
         self.app = app or QApplication.instance() or QApplication([])
+        icono = QIcon(str(Path(__file__).resolve().parent.parent / "Logo.ico"))
+        if not icono.isNull():
+            self.app.setWindowIcon(icono)
         init_db()
-        self.ventana_principal = VentanaPrincipal()
         self.db = SessionLocal()
+        self.cancelado = False
+        self.usuario_actual = None
+        if AUTENTICACION_HABILITADA:
+            dialogo_login = DialogoLogin(self.db)
+            if dialogo_login.exec_() != QDialog.Accepted:
+                self.cancelado = True
+                self.db.close()
+                return
+            self.usuario_actual = dialogo_login.usuario
+        self.ventana_principal = VentanaPrincipal(self.usuario_actual, self.db)
+        if not icono.isNull():
+            self.ventana_principal.setWindowIcon(icono)
         self.ventana_principal.configurar_logger_grafico()
+        self._firma_alertas_stock = None
+        self._configurar_alertas_bandeja(icono)
     
     def ejecutar(self):
         """Ejecuta la aplicación"""
+        if self.cancelado:
+            return
         self.ventana_principal.show()
         self.app.exec_()
+
+    def _configurar_alertas_bandeja(self, icono):
+        """Activa el icono y el sondeo periódico de alertas de stock."""
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            logger.warning("La bandeja del sistema no está disponible; se omiten alertas de stock")
+            return
+
+        self.tray_icon = QSystemTrayIcon(icono, self.ventana_principal)
+        menu = QMenu(self.ventana_principal)
+        abrir_accion = QAction("Abrir SNIG", menu)
+        abrir_accion.triggered.connect(self.ventana_principal.showNormal)
+        menu.addAction(abrir_accion)
+        inventario_accion = QAction("Ver stock bajo", menu)
+        inventario_accion.triggered.connect(self._mostrar_stock_bajo)
+        menu.addAction(inventario_accion)
+        menu.addSeparator()
+        salir_accion = QAction("Salir", menu)
+        salir_accion.triggered.connect(self.app.quit)
+        menu.addAction(salir_accion)
+        self.tray_icon.setContextMenu(menu)
+        self.tray_icon.activated.connect(self._activar_icono_bandeja)
+        self.tray_icon.messageClicked.connect(self._mostrar_stock_bajo)
+        self.tray_icon.show()
+
+        self.alerta_stock_timer = QTimer(self.ventana_principal)
+        self.alerta_stock_timer.setInterval(ALERTA_STOCK_INTERVALO_MINUTOS * 60_000)
+        self.alerta_stock_timer.timeout.connect(self._comprobar_stock_bajo)
+        self.alerta_stock_timer.start()
+        self._comprobar_stock_bajo()
+
+    def _activar_icono_bandeja(self, razon):
+        if razon in (
+            QSystemTrayIcon.Trigger,
+            QSystemTrayIcon.DoubleClick,
+        ):
+            self.ventana_principal.showNormal()
+            self.ventana_principal.raise_()
+            self.ventana_principal.activateWindow()
+
+    def _comprobar_stock_bajo(self):
+        """Notifica cambios nuevos en los productos bajo el mínimo de stock."""
+        alertas = self.ventana_principal.inventario.obtener_productos_stock_bajo()
+        firma = tuple(sorted(
+            (alerta["gtin"], alerta["presentacion"], alerta["stock_actual"], alerta["urgencia"])
+            for alerta in alertas
+        ))
+        if firma == self._firma_alertas_stock:
+            return
+        self._firma_alertas_stock = firma
+        if not alertas:
+            return
+
+        criticos = sum(alerta["urgencia"] == "CRÍTICO" for alerta in alertas)
+        bajos = len(alertas) - criticos
+        resumen = f"{criticos} críticos · {bajos} bajos"
+        self.tray_icon.showMessage(
+            "SNIG: alerta de inventario",
+            f"{len(alertas)} presentaciones requieren atención ({resumen}). Pulsa para abrir Inventario.",
+            QSystemTrayIcon.Warning,
+            10_000,
+        )
+
+    def _mostrar_stock_bajo(self):
+        """Abre Inventario mostrando solo presentaciones en o bajo su mínimo."""
+        ventana = self.ventana_principal
+        ventana.showNormal()
+        ventana.raise_()
+        ventana.activateWindow()
+        ventana.pestanas.setCurrentIndex(1)
+        ventana.filtrar_productos_stock_bajo_gui()
+
+
+class DialogoCierreCaja(QDialog):
+    """Resumen diario de ventas por cajero y método de pago."""
+
+    def __init__(self, pos, parent=None, usuario=None):
+        super().__init__(parent)
+        self.pos = pos
+        self.usuario = usuario
+        self.setWindowTitle("Arqueo y cierre de caja")
+        self.resize(680, 520)
+
+        layout = QVBoxLayout(self)
+        formulario = QFormLayout()
+        self.selector_fecha = QDateEdit(QDate.currentDate())
+        self.selector_fecha.setCalendarPopup(True)
+        self.selector_fecha.setDisplayFormat("yyyy-MM-dd")
+        self.selector_fecha.setAccessibleName("Fecha del cierre de caja")
+        formulario.addRow("Fecha del cierre:", self.selector_fecha)
+        layout.addLayout(formulario)
+
+        self.resumen_ingresos = QLabel()
+        self.resumen_ingresos.setStyleSheet("font-size: 17px; font-weight: bold;")
+        layout.addWidget(self.resumen_ingresos)
+        self.resumen_ventas = QLabel()
+        layout.addWidget(self.resumen_ventas)
+
+        layout.addWidget(QLabel("Resumen por cajero"))
+        self.tabla_cajeros = QTableWidget(0, 3)
+        self.tabla_cajeros.setHorizontalHeaderLabels(["Cajero", "Ventas", "Total vendido"])
+        self.tabla_cajeros.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.tabla_cajeros.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(self.tabla_cajeros)
+
+        layout.addWidget(QLabel("Resumen por método de pago"))
+        self.tabla_metodos = QTableWidget(0, 2)
+        self.tabla_metodos.setHorizontalHeaderLabels(["Método", "Total recibido"])
+        self.tabla_metodos.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.tabla_metodos.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(self.tabla_metodos)
+
+        botones = QHBoxLayout()
+        btn_pdf = QPushButton("Exportar cierre a PDF")
+        btn_pdf.clicked.connect(self.exportar_pdf)
+        botones.addWidget(btn_pdf)
+        botones.addStretch(1)
+        btn_cerrar = QPushButton("Cerrar")
+        btn_cerrar.clicked.connect(self.accept)
+        botones.addWidget(btn_cerrar)
+        layout.addLayout(botones)
+
+        self.selector_fecha.dateChanged.connect(self.actualizar_resumen)
+        self.actualizar_resumen()
+
+    def fecha_seleccionada(self):
+        return self.selector_fecha.date().toString("yyyy-MM-dd")
+
+    def actualizar_resumen(self, *_):
+        """Recarga los totales del día seleccionado."""
+        fecha = self.fecha_seleccionada()
+        metricas = self.pos.obtener_metricas_cierre_caja(fecha, self.usuario)
+        cajeros = self.pos.obtener_resumen_por_cajero(fecha, self.usuario)
+
+        self.resumen_ingresos.setText(
+            f"Ingresos del día: {formatear_moneda(metricas['total_ingresos'])}"
+        )
+        self.resumen_ventas.setText(
+            f"Tickets: {metricas['cantidad_ventas']} · "
+            f"Ticket promedio: {formatear_moneda(metricas['ticket_promedio'])}"
+        )
+
+        self.tabla_cajeros.setRowCount(len(cajeros))
+        for fila, (nombre, resumen) in enumerate(sorted(cajeros.items())):
+            self.tabla_cajeros.setItem(fila, 0, QTableWidgetItem(nombre))
+            self.tabla_cajeros.setItem(
+                fila, 1, QTableWidgetItem(str(resumen["cantidad"]))
+            )
+            self.tabla_cajeros.setItem(
+                fila, 2, QTableWidgetItem(formatear_moneda(resumen["total"]))
+            )
+
+        metodos = metricas["metodos_pago"]
+        self.tabla_metodos.setRowCount(len(metodos))
+        for fila, (nombre, total) in enumerate(sorted(metodos.items())):
+            self.tabla_metodos.setItem(fila, 0, QTableWidgetItem(nombre.capitalize()))
+            self.tabla_metodos.setItem(
+                fila, 1, QTableWidgetItem(formatear_moneda(total))
+            )
+
+    def exportar_pdf(self):
+        """Guarda el resumen visible del cierre de caja como PDF."""
+        fecha = self.fecha_seleccionada()
+        ruta, _ = QFileDialog.getSaveFileName(
+            self,
+            "Exportar cierre de caja",
+            f"cierre_caja_{fecha}.pdf",
+            "Documentos PDF (*.pdf)",
+        )
+        if not ruta:
+            return
+        if not ruta.lower().endswith(".pdf"):
+            ruta += ".pdf"
+
+        try:
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import letter
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.lib.units import mm
+            from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+            metricas = self.pos.obtener_metricas_cierre_caja(fecha, self.usuario)
+            cajeros = self.pos.obtener_resumen_por_cajero(fecha, self.usuario)
+            elementos = [
+                Paragraph("Arqueo y cierre de caja", getSampleStyleSheet()["Title"]),
+                Paragraph(f"Fecha: {fecha}", getSampleStyleSheet()["Normal"]),
+                Paragraph(
+                    f"Total ingresos: {formatear_moneda(metricas['total_ingresos'])}",
+                    getSampleStyleSheet()["Heading2"],
+                ),
+                Paragraph(
+                    f"Tickets: {metricas['cantidad_ventas']} · "
+                    f"Ticket promedio: {formatear_moneda(metricas['ticket_promedio'])}",
+                    getSampleStyleSheet()["Normal"],
+                ),
+                Spacer(1, 6 * mm),
+                Paragraph("Resumen por cajero", getSampleStyleSheet()["Heading2"]),
+            ]
+            filas_cajeros = [["Cajero", "Ventas", "Total vendido"]]
+            filas_cajeros.extend(
+                [nombre, str(resumen["cantidad"]), formatear_moneda(resumen["total"])]
+                for nombre, resumen in sorted(cajeros.items())
+            )
+            filas_metodos = [["Método de pago", "Total recibido"]]
+            filas_metodos.extend(
+                [nombre.capitalize(), formatear_moneda(total)]
+                for nombre, total in sorted(metricas["metodos_pago"].items())
+            )
+            estilo_tabla = TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1d4ed8")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f1f5f9")]),
+                ("PADDING", (0, 0), (-1, -1), 7),
+            ])
+            tabla_cajeros = Table(filas_cajeros, repeatRows=1)
+            tabla_cajeros.setStyle(estilo_tabla)
+            elementos.extend([
+                tabla_cajeros,
+                Spacer(1, 5 * mm),
+                Paragraph("Resumen por método de pago", getSampleStyleSheet()["Heading2"]),
+            ])
+            tabla_metodos = Table(filas_metodos, repeatRows=1)
+            tabla_metodos.setStyle(estilo_tabla)
+            elementos.append(tabla_metodos)
+            SimpleDocTemplate(
+                ruta,
+                pagesize=letter,
+                rightMargin=18 * mm,
+                leftMargin=18 * mm,
+                topMargin=18 * mm,
+                bottomMargin=18 * mm,
+            ).build(elementos)
+        except Exception as error:
+            logger.exception("No se pudo exportar el cierre de caja")
+            QMessageBox.critical(
+                self,
+                "Error al exportar cierre",
+                f"No se pudo crear el PDF del cierre de caja:\n{error}",
+            )
+            return
+
+        QMessageBox.information(self, "Cierre exportado", f"PDF guardado en:\n{ruta}")
 
 
 class VentanaPrincipal(QMainWindow):
     """Ventana principal de la aplicación"""
     
-    def __init__(self):
+    def __init__(self, usuario=None, db=None):
         """Inicializa la ventana principal"""
         super().__init__()
         
         self.setWindowTitle("Sistema de Inventario General")
         
         # Inicializar gestores
-        self.db = SessionLocal()
+        self.db = db if db is not None else SessionLocal()
+        self.usuario_actual = usuario
         self.inventario = GestorInventario(self.db)
         self.pos = GestorPOS(self.db)
         self.escaneo = EscanerProducto()
@@ -193,6 +669,12 @@ class VentanaPrincipal(QMainWindow):
         self.pestanas.addTab(self.pestana_proveedores, "🏭 Proveedores")
         self.pestana_logs = self.crear_pestaña_logs()
         self.pestanas.addTab(self.pestana_logs, "📝 Logs")
+        self.pestana_usuarios = (
+            self.crear_pestaña_usuarios()
+            if AUTENTICACION_HABILITADA
+            else QWidget()
+        )
+        self.pestanas.addTab(self.pestana_usuarios, "👥 Usuarios")
         logs_index = self.pestanas.indexOf(self.pestana_logs)
         self.pestanas.tabBar().setTabVisible(logs_index, False)
 
@@ -265,6 +747,7 @@ class VentanaPrincipal(QMainWindow):
             ("▤   Reportes", 3),
             ("♙   Proveedores", 4),
             ("☷   Registros", 5),
+            ("👥   Usuarios", 6),
         ]
         for texto_boton, indice in elementos_nav:
             boton = QPushButton(texto_boton)
@@ -278,6 +761,24 @@ class VentanaPrincipal(QMainWindow):
             sidebar_layout.addWidget(boton)
             self._nav_buttons.append(boton)
         self._nav_buttons[5].hide()
+        self.etiqueta_usuario = QLabel(
+            f"Sesión: {self.usuario_actual.nombre} ({self.usuario_actual.rol})"
+            if self.usuario_actual
+            else ""
+        )
+        self.etiqueta_usuario.setWordWrap(True)
+        self.etiqueta_usuario.setAccessibleName("Usuario autenticado")
+        self.boton_cambiar_usuario = QPushButton("Cambiar usuario")
+        self.boton_cambiar_usuario.clicked.connect(self.cambiar_usuario)
+        self.etiqueta_usuario.setVisible(AUTENTICACION_HABILITADA)
+        self.boton_cambiar_usuario.setVisible(AUTENTICACION_HABILITADA)
+        self._nav_buttons[6].setVisible(AUTENTICACION_HABILITADA)
+        self.pestanas.tabBar().setTabVisible(
+            self.pestanas.indexOf(self.pestana_usuarios),
+            AUTENTICACION_HABILITADA,
+        )
+        sidebar_layout.addWidget(self.etiqueta_usuario)
+        sidebar_layout.addWidget(self.boton_cambiar_usuario)
         sidebar_layout.addStretch(1)
 
         estado_local = QLabel("●  Sistema operativo")
@@ -312,6 +813,7 @@ class VentanaPrincipal(QMainWindow):
         self.pestanas.currentChanged.connect(self._enfocar_gtin_pos_si_corresponde)
         self.pestanas.setCurrentIndex(self._indice_pestana_activa)
         self._actualizar_navegacion(self._indice_pestana_activa)
+        self._aplicar_permisos_rol()
 
         self.statusBar().showMessage("Listo")
         if not getattr(self, "_ui_inicializada", False):
@@ -358,7 +860,9 @@ class VentanaPrincipal(QMainWindow):
             "QPushButton { background: #2563eb; color: white; border: none; border-radius: 8px; "
             "padding: 10px 18px; font-weight: 700; } QPushButton:hover { background: #1d4ed8; }"
         )
+        boton_pos.setObjectName("abrirPosInicio")
         boton_pos.clicked.connect(lambda: self.pestanas.setCurrentIndex(2))
+        self._boton_inicio_pos = boton_pos
         hero_layout.addWidget(boton_pos)
         layout.addWidget(hero)
 
@@ -371,6 +875,7 @@ class VentanaPrincipal(QMainWindow):
             ("VALOR DEL INVENTARIO", formatear_moneda(reporte["valor_inventario"]), "#16a34a"),
             ("ALERTAS DE STOCK", formatear_numero(reporte["productos_alerta"]), "#ea580c"),
         ]
+        self._home_financial_cards = []
         for columna, (nombre, valor, color) in enumerate(metricas):
             tarjeta = QFrame()
             tarjeta.setStyleSheet(
@@ -386,6 +891,8 @@ class VentanaPrincipal(QMainWindow):
             tarjeta_layout.addWidget(label_nombre)
             tarjeta_layout.addWidget(label_valor)
             tarjetas.addWidget(tarjeta, 0, columna)
+            if nombre == "VALOR DEL INVENTARIO":
+                self._home_financial_cards.append(tarjeta)
         layout.addLayout(tarjetas)
 
         etiqueta_accesos = QLabel("Accesos rápidos")
@@ -400,6 +907,7 @@ class VentanaPrincipal(QMainWindow):
             ("Punto de venta", "Agrega productos al carrito y registra ventas.", "Abrir POS", 2, "#16a34a"),
             ("Reportes", "Revisa indicadores de inventario y ventas.", "Ver reportes", 3, "#7c3aed"),
         ]
+        self._home_access_buttons = []
         for columna, (nombre, descripcion, accion, indice, color) in enumerate(datos_accesos):
             tarjeta = QFrame()
             tarjeta.setStyleSheet(
@@ -414,6 +922,7 @@ class VentanaPrincipal(QMainWindow):
             label_descripcion.setWordWrap(True)
             label_descripcion.setStyleSheet(f"font-size: 13px; color: {muted};")
             boton = QPushButton(accion)
+            boton.setProperty("page_index", indice)
             boton.setMinimumHeight(40)
             boton.setStyleSheet(
                 f"QPushButton {{ color: {color}; background: transparent; border: 1px solid {color}; "
@@ -425,6 +934,7 @@ class VentanaPrincipal(QMainWindow):
             tarjeta_layout.addWidget(label_descripcion, 1)
             tarjeta_layout.addWidget(boton)
             accesos.addWidget(tarjeta, 0, columna)
+            self._home_access_buttons.append((tarjeta, indice))
         layout.addLayout(accesos)
         layout.addStretch(1)
         return widget
@@ -433,10 +943,173 @@ class VentanaPrincipal(QMainWindow):
         """Sincroniza el menú lateral y el encabezado con la sección activa."""
         if not hasattr(self, "_nav_buttons"):
             return
-        titulos = ["Panel principal", "Inventario", "Punto de venta", "Reportes", "Proveedores", "Registros"]
+        titulos = [
+            "Panel principal",
+            "Inventario",
+            "Punto de venta",
+            "Reportes",
+            "Proveedores",
+            "Registros",
+            "Usuarios",
+        ]
         if 0 <= indice < len(self._nav_buttons):
             self._nav_buttons[indice].setChecked(True)
             self.titulo_seccion.setText(titulos[indice])
+
+    def _aplicar_permisos_rol(self):
+        """Restringe navegación y accesos rápidos según el rol autenticado."""
+        if not AUTENTICACION_HABILITADA:
+            permitidas = {0, 1, 2, 3, 4, 5}
+            for indice in range(self.pestanas.count()):
+                visible = indice in permitidas
+                self.pestanas.tabBar().setTabVisible(indice, visible)
+                if indice < len(self._nav_buttons):
+                    self._nav_buttons[indice].setVisible(visible)
+            self._boton_inicio_pos.setVisible(True)
+            for tarjeta in self._home_financial_cards:
+                tarjeta.setVisible(True)
+            for tarjeta, indice in self._home_access_buttons:
+                tarjeta.setVisible(indice in permitidas)
+            self.etiqueta_usuario.hide()
+            self.boton_cambiar_usuario.hide()
+            if self.pestanas.currentIndex() not in permitidas:
+                self.pestanas.setCurrentIndex(0)
+            self._actualizar_navegacion(self.pestanas.currentIndex())
+            return
+
+        rol = self.usuario_actual.rol if self.usuario_actual else ""
+        acceso_por_rol = {
+            "admin": {0, 1, 2, 3, 4, 5, 6},
+            "inventario": {0, 1, 4},
+            "cajero": {0, 2},
+        }
+        permitidas = acceso_por_rol.get(rol, {0})
+        for indice in range(self.pestanas.count()):
+            visible = indice in permitidas
+            self.pestanas.tabBar().setTabVisible(indice, visible)
+            if indice < len(self._nav_buttons):
+                self._nav_buttons[indice].setVisible(visible)
+        self._boton_inicio_pos.setVisible(2 in permitidas)
+        for tarjeta in self._home_financial_cards:
+            tarjeta.setVisible(rol == "admin")
+        for tarjeta, indice in self._home_access_buttons:
+            tarjeta.setVisible(indice in permitidas)
+        if self.pestanas.currentIndex() not in permitidas:
+            self.pestanas.setCurrentIndex(0)
+        if self.usuario_actual:
+            self.etiqueta_usuario.setText(
+                f"Sesión: {self.usuario_actual.nombre} ({self.usuario_actual.rol})"
+            )
+        self._actualizar_navegacion(self.pestanas.currentIndex())
+
+    def cambiar_usuario(self):
+        """Reautentica y actualiza la sesión activa."""
+        if not AUTENTICACION_HABILITADA:
+            return
+        dialogo = DialogoLogin(self.db, self)
+        if dialogo.exec_() != QDialog.Accepted:
+            return
+        self.usuario_actual = dialogo.usuario
+        self._aplicar_permisos_rol()
+        self.statusBar().showMessage(
+            f"Sesión iniciada como {self.usuario_actual.nombre}", 8_000
+        )
+
+    def crear_pestaña_usuarios(self):
+        """Crea la pantalla administrativa para gestionar cuentas y roles."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        descripcion = QLabel(
+            "Administra usuarios y roles. Las contraseñas se guardan como hashes PBKDF2."
+        )
+        descripcion.setWordWrap(True)
+        layout.addWidget(descripcion)
+
+        self.tabla_usuarios = QTableWidget(0, 4)
+        self.tabla_usuarios.setAccessibleName("Usuarios del sistema")
+        self.tabla_usuarios.setHorizontalHeaderLabels(
+            ["Nombre", "Correo", "Rol", "Estado"]
+        )
+        self.tabla_usuarios.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.tabla_usuarios.setSelectionBehavior(QTableWidget.SelectRows)
+        self.tabla_usuarios.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(self.tabla_usuarios)
+
+        botones = QHBoxLayout()
+        agregar = QPushButton("Agregar usuario")
+        agregar.clicked.connect(self.agregar_usuario_gui)
+        botones.addWidget(agregar)
+        editar = QPushButton("Editar usuario / contraseña")
+        editar.clicked.connect(self.editar_usuario_gui)
+        botones.addWidget(editar)
+        estado = QPushButton("Activar / desactivar")
+        estado.clicked.connect(self.alternar_estado_usuario_gui)
+        botones.addWidget(estado)
+        actualizar = QPushButton("Actualizar lista")
+        actualizar.clicked.connect(self.actualizar_tabla_usuarios)
+        botones.addWidget(actualizar)
+        layout.addLayout(botones)
+        self.actualizar_tabla_usuarios()
+        return widget
+
+    def actualizar_tabla_usuarios(self):
+        usuarios = self.db.query(Usuario).order_by(Usuario.nombre).all()
+        self.tabla_usuarios.setRowCount(len(usuarios))
+        for fila, usuario in enumerate(usuarios):
+            nombre = QTableWidgetItem(usuario.nombre)
+            nombre.setData(Qt.UserRole, usuario.id)
+            self.tabla_usuarios.setItem(fila, 0, nombre)
+            self.tabla_usuarios.setItem(fila, 1, QTableWidgetItem(usuario.email or ""))
+            self.tabla_usuarios.setItem(fila, 2, QTableWidgetItem(usuario.rol))
+            self.tabla_usuarios.setItem(
+                fila,
+                3,
+                QTableWidgetItem("Activo" if usuario.activo else "Inactivo"),
+            )
+
+    def _usuario_seleccionado(self):
+        fila = self.tabla_usuarios.currentRow()
+        if fila < 0:
+            QMessageBox.information(self, "Selecciona un usuario", "Elige una fila de la tabla.")
+            return None
+        item = self.tabla_usuarios.item(fila, 0)
+        return self.db.get(Usuario, item.data(Qt.UserRole)) if item else None
+
+    def agregar_usuario_gui(self):
+        if DialogoUsuario(self.db, parent=self).exec_() == QDialog.Accepted:
+            self.actualizar_tabla_usuarios()
+
+    def editar_usuario_gui(self):
+        usuario = self._usuario_seleccionado()
+        if usuario is None:
+            return
+        if DialogoUsuario(self.db, usuario, self).exec_() == QDialog.Accepted:
+            self.actualizar_tabla_usuarios()
+            if self.usuario_actual.id == usuario.id:
+                self._aplicar_permisos_rol()
+
+    def alternar_estado_usuario_gui(self):
+        usuario = self._usuario_seleccionado()
+        if usuario is None:
+            return
+        if self.usuario_actual and usuario.id == self.usuario_actual.id:
+            QMessageBox.warning(self, "Acción no permitida", "No puedes desactivar tu propia cuenta.")
+            return
+        if usuario.activo and usuario.rol == "admin":
+            admins_activos = self.db.query(Usuario).filter(
+                Usuario.activo.is_(True),
+                Usuario.rol == "admin",
+            ).count()
+            if admins_activos <= 1:
+                QMessageBox.warning(
+                    self,
+                    "Acción no permitida",
+                    "Debe permanecer al menos un administrador activo.",
+                )
+                return
+        usuario.activo = not usuario.activo
+        self.db.commit()
+        self.actualizar_tabla_usuarios()
 
     def _cargar_modo_oscuro(self) -> bool:
         """Carga la preferencia de modo oscuro/claro guardada."""
@@ -525,16 +1198,16 @@ class VentanaPrincipal(QMainWindow):
         layout_cabecera.setContentsMargins(16, 14, 16, 14)
         layout_cabecera.setSpacing(12)
 
-        label_gtin = QLabel("GTIN:")
+        label_gtin = QLabel("Barcode:")
         layout_cabecera.addWidget(label_gtin)
 
         self.entrada_gtin = QLineEdit()
         label_gtin.setBuddy(self.entrada_gtin)
         self.entrada_gtin.setAccessibleName("Buscar productos")
         self.entrada_gtin.setAccessibleDescription(
-            "Busca en el inventario por nombre, GTIN, laboratorio o descripción."
+            "Busca en el inventario por nombre, Barcode o descripción."
         )
-        self.entrada_gtin.setPlaceholderText("Buscar por nombre, GTIN, laboratorio...")
+        self.entrada_gtin.setPlaceholderText("Buscar por nombre, Barcode o descripción...")
         self.entrada_gtin.setMinimumHeight(42)
         self.entrada_gtin.returnPressed.connect(self.buscar_producto)
         layout_cabecera.addWidget(self.entrada_gtin, 1)
@@ -576,7 +1249,7 @@ class VentanaPrincipal(QMainWindow):
         self.tabla_inventario.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.tabla_inventario.setColumnCount(5)
         self.tabla_inventario.setHorizontalHeaderLabels(
-            ["GTIN", "Nombre", "Stock", "Precio", "Proveedor"]
+            ["Barcode", "Nombre", "Stock", "Precio", "Proveedor"]
         )
         self.tabla_inventario.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tabla_inventario.customContextMenuRequested.connect(self.mostrar_menu_contextual_inventario)
@@ -672,7 +1345,7 @@ class VentanaPrincipal(QMainWindow):
         layout_principal.setContentsMargins(12, 12, 12, 12)
         layout_principal.setSpacing(10)
 
-        # Barra superior: escáner / GTIN
+        # Barra superior: escáner / Barcode
         contenedor_busqueda = QWidget()
         contenedor_busqueda.setStyleSheet(
             f"background-color: {superficie}; border: 1px solid {borde}; border-radius: 6px; padding: 8px;"
@@ -681,13 +1354,13 @@ class VentanaPrincipal(QMainWindow):
         layout_busqueda.setContentsMargins(10, 10, 10, 10)
         layout_busqueda.setSpacing(6)
 
-        label_busqueda = QLabel("Escanea o ingresa el GTIN")
+        label_busqueda = QLabel("Escanea o ingresa el Barcode")
         label_busqueda.setStyleSheet(f"font-weight: bold; color: {texto};")
         layout_busqueda.addWidget(label_busqueda)
 
         self.entrada_gtin_pos = QLineEdit()
         label_busqueda.setBuddy(self.entrada_gtin_pos)
-        self.entrada_gtin_pos.setAccessibleName("Escanear o buscar GTIN")
+        self.entrada_gtin_pos.setAccessibleName("Escanear o buscar Barcode")
         self.entrada_gtin_pos.setPlaceholderText("Código")
         self.entrada_gtin_pos.setFixedHeight(36)
         self.entrada_gtin_pos.returnPressed.connect(self.agregar_a_carrito_gui)
@@ -789,6 +1462,12 @@ class VentanaPrincipal(QMainWindow):
         btn_pagar.clicked.connect(self.procesar_pago_gui)
         layout_botones_pos.addWidget(btn_pagar)
 
+        btn_cierre_caja = QPushButton("🧾 Arqueo / Cierre de Caja")
+        btn_cierre_caja.setMinimumHeight(58)
+        btn_cierre_caja.setMinimumWidth(210)
+        btn_cierre_caja.clicked.connect(self.mostrar_cierre_caja_gui)
+        layout_botones_pos.addWidget(btn_cierre_caja)
+
         layout_derecha.addLayout(layout_botones_pos)
 
         layout_contenido.addLayout(layout_derecha, 2)
@@ -798,13 +1477,22 @@ class VentanaPrincipal(QMainWindow):
         return widget
 
     def _enfocar_gtin_pos(self):
-        """Enfoca automáticamente el campo GTIN del POS si existe."""
+        """Enfoca automáticamente el campo Barcode del POS si existe."""
         if hasattr(self, "entrada_gtin_pos") and self.entrada_gtin_pos is not None:
             self.entrada_gtin_pos.setFocus()
             self.entrada_gtin_pos.selectAll()
 
+    def mostrar_cierre_caja_gui(self):
+        """Abre las métricas diarias de caja."""
+        usuario = (
+            self.usuario_actual.nombre
+            if self.usuario_actual and self.usuario_actual.rol == "cajero"
+            else None
+        )
+        DialogoCierreCaja(self.pos, self, usuario=usuario).exec_()
+
     def _enfocar_gtin_pos_si_corresponde(self, index):
-        """Enfoca el campo GTIN del POS cuando la pestaña activa es la de POS."""
+        """Enfoca el campo Barcode del POS cuando la pestaña activa es la de POS."""
         if self.pestanas.widget(index) is self.pestana_pos:
             QTimer.singleShot(0, self._enfocar_gtin_pos)
     
@@ -853,6 +1541,11 @@ class VentanaPrincipal(QMainWindow):
         btn_reporte_ventas.clicked.connect(self.generar_reporte_ventas)
         botones_layout.addWidget(btn_reporte_ventas)
 
+        btn_reporte_pdf = QPushButton("📄 Descargar / Ver Reporte PDF")
+        btn_reporte_pdf.setObjectName("exportarReportePdf")
+        btn_reporte_pdf.clicked.connect(self.exportar_reporte_pdf_gui)
+        botones_layout.addWidget(btn_reporte_pdf)
+
         btn_logs = QPushButton("📝 Ver Logs del Sistema")
         btn_logs.clicked.connect(self.abrir_logs_desde_reportes)
         botones_layout.addWidget(btn_logs)
@@ -871,6 +1564,121 @@ class VentanaPrincipal(QMainWindow):
 
         widget.setLayout(layout)
         return widget
+
+    def exportar_reporte_pdf_gui(self):
+        """Genera, guarda y abre un reporte PDF de la sesión actual."""
+        ruta, _ = QFileDialog.getSaveFileName(
+            self,
+            "Guardar reporte PDF",
+            f"reporte_snig_{datetime.now():%Y-%m-%d_%H-%M-%S}.pdf",
+            "Documentos PDF (*.pdf)",
+        )
+        if not ruta:
+            return
+        if not ruta.lower().endswith(".pdf"):
+            ruta += ".pdf"
+
+        try:
+            import pandas as pd
+
+            from reporting.pdf_export import generar_reporte_pdf
+
+            datos = self._obtener_datos_reporte_pdf(pd)
+            contenido = generar_reporte_pdf(datos)
+            with open(ruta, "wb") as archivo:
+                archivo.write(contenido)
+        except Exception as error:
+            logger.exception("No se pudo generar el reporte PDF")
+            QMessageBox.critical(
+                self,
+                "Error al generar el reporte",
+                f"No se pudo crear el reporte PDF:\n{error}",
+            )
+            return
+
+        if not QDesktopServices.openUrl(QUrl.fromLocalFile(ruta)):
+            QMessageBox.warning(
+                self,
+                "Reporte guardado",
+                f"El PDF se guardó en:\n{ruta}\npero no se pudo abrir automáticamente.",
+            )
+            return
+
+        self.texto_reporte.setText(f"Reporte PDF generado y abierto:\n{ruta}")
+
+    def _obtener_datos_reporte_pdf(self, pd):
+        """Convierte ventas, inventario y movimientos de la sesión a tablas PDF."""
+        ventas = self.db.query(Venta).order_by(Venta.fecha.desc()).all()
+        presentaciones = self.db.query(Presentacion, Producto).join(
+            Producto, Producto.id == Presentacion.producto_id
+        ).all()
+        items = self.db.query(VentaItem).all()
+        movimientos = self.db.query(MovimientoInventario).order_by(
+            MovimientoInventario.fecha.desc()
+        ).all()
+
+        return {
+            "ventas": pd.DataFrame([
+                {
+                    "Ticket": venta.numero_ticket,
+                    "FechaHora": venta.fecha,
+                    "MetodoPago": venta.metodo_pago or "Sin especificar",
+                    "Usuario": venta.usuario or "Sistema",
+                    "Total": round(venta.total or 0),
+                }
+                for venta in ventas
+            ]),
+            "presentaciones": pd.DataFrame([
+                {
+                    "Barcode": producto.gtin,
+                    "Producto": producto.nombre,
+                    "TipoPresentacion": (
+                        presentacion.tipo.value
+                        if hasattr(presentacion.tipo, "value")
+                        else str(presentacion.tipo)
+                    ),
+                    "StockActual": presentacion.stock_actual,
+                    "StockMinimo": presentacion.stock_minimo,
+                    "PrecioCosto": presentacion.precio_unitario,
+                    "PrecioVenta": presentacion.precio_venta,
+                }
+                for presentacion, producto in presentaciones
+            ]),
+            "items": pd.DataFrame([
+                {
+                    "Ticket": item.venta.numero_ticket,
+                    "Producto": item.producto.nombre if item.producto else f"Producto #{item.producto_id}",
+                    "Presentacion": (
+                        item.presentacion.tipo.value
+                        if hasattr(item.presentacion.tipo, "value")
+                        else str(item.presentacion.tipo)
+                    ),
+                    "Cantidad": item.cantidad,
+                    "PrecioUnitario": item.precio_unitario,
+                    "Subtotal": item.subtotal,
+                }
+                for item in items
+            ]),
+            "movimientos": pd.DataFrame([
+                {
+                    "FechaHora": movimiento.fecha,
+                    "Producto": (
+                        movimiento.producto.nombre
+                        if movimiento.producto
+                        else f"Producto #{movimiento.producto_id}"
+                    ),
+                    "TipoMovimiento": (
+                        movimiento.tipo_movimiento.value
+                        if hasattr(movimiento.tipo_movimiento, "value")
+                        else str(movimiento.tipo_movimiento)
+                    ),
+                    "Cantidad": movimiento.cantidad,
+                    "Razon": movimiento.razon or "Sin razón",
+                    "Usuario": movimiento.usuario or "Sistema",
+                }
+                for movimiento in movimientos
+            ]),
+        }
 
     def crear_pestaña_proveedores(self) -> QWidget:
         """Crea el catálogo de proveedores y sus relaciones con productos."""
@@ -1124,10 +1932,10 @@ class VentanaPrincipal(QMainWindow):
         root_logger.setLevel(logging.INFO)
 
     def buscar_producto(self):
-        """Busca productos por nombre, GTIN, laboratorio o descripción"""
+        """Busca productos por nombre, Barcode o descripción."""
         termino = self.entrada_gtin.text().strip()
         if not termino:
-            QMessageBox.warning(self, "Advertencia", "Ingresa un GTIN o término de búsqueda")
+            QMessageBox.warning(self, "Advertencia", "Ingresa un Barcode o término de búsqueda")
             return
         
         productos = self.inventario.buscar_productos(termino)
@@ -1213,6 +2021,44 @@ class VentanaPrincipal(QMainWindow):
                     fila, 4, QTableWidgetItem(self._nombres_proveedores(producto))
                 )
 
+    def filtrar_productos_stock_bajo_gui(self):
+        """Muestra en inventario solo presentaciones en o bajo el stock mínimo."""
+        alertas = self.inventario.obtener_productos_stock_bajo()
+        productos_alerta = {alerta["producto_id"] for alerta in alertas}
+        self.entrada_gtin.clear()
+        self.tabla_inventario.setRowCount(0)
+
+        if not productos_alerta:
+            self.statusBar().showMessage("No hay presentaciones con stock bajo.", 8_000)
+            return
+
+        for producto in self.inventario.obtener_productos():
+            if producto.id not in productos_alerta:
+                continue
+            for presentacion in producto.presentaciones:
+                if presentacion.stock_actual > presentacion.stock_minimo:
+                    continue
+                fila = self.tabla_inventario.rowCount()
+                self.tabla_inventario.insertRow(fila)
+                item_gtin = QTableWidgetItem(producto.gtin)
+                item_gtin.setData(Qt.UserRole, presentacion.id)
+                self.tabla_inventario.setItem(fila, 0, item_gtin)
+                self.tabla_inventario.setItem(fila, 1, QTableWidgetItem(producto.nombre))
+                self.tabla_inventario.setItem(
+                    fila, 2, QTableWidgetItem(str(presentacion.stock_actual))
+                )
+                self.tabla_inventario.setItem(
+                    fila, 3, QTableWidgetItem(formatear_moneda(presentacion.precio_venta))
+                )
+                self.tabla_inventario.setItem(
+                    fila, 4, QTableWidgetItem(self._nombres_proveedores(producto))
+                )
+
+        self.statusBar().showMessage(
+            f"Filtro de stock bajo: {self.tabla_inventario.rowCount()} presentaciones",
+            8_000,
+        )
+
     def obtener_producto_y_presentacion_desde_fila(self, fila=None):
         """Obtiene el producto y la presentación asociados a una fila de la tabla."""
         if fila is None:
@@ -1292,7 +2138,6 @@ class VentanaPrincipal(QMainWindow):
             producto_id=producto.id,
             gtin=datos["gtin"],
             nombre=datos["nombre"],
-            laboratorio=datos["laboratorio"],
             descripcion=datos["descripcion"],
             presentacion_id=presentacion.id,
             precio_venta=datos["precio_venta"],
@@ -1301,7 +2146,7 @@ class VentanaPrincipal(QMainWindow):
             QMessageBox.warning(
                 self,
                 "Error",
-                "No se pudo actualizar el producto. Verifica que el GTIN no esté en uso.",
+                "No se pudo actualizar el producto. Verifica que el Barcode no esté en uso.",
             )
             return
 
@@ -1346,7 +2191,7 @@ class VentanaPrincipal(QMainWindow):
     def mostrar_detalle_producto(self, producto, presentacion):
         """Muestra un detalle del producto seleccionado desde el menú contextual."""
         mensaje = (
-            f"GTIN: {producto.gtin}\n"
+            f"Barcode: {producto.gtin}\n"
             f"Nombre: {producto.nombre}\n"
             f"Presentación: {presentacion.tipo.value}\n"
             f"Stock actual: {presentacion.stock_actual}\n"
@@ -1383,7 +2228,6 @@ class VentanaPrincipal(QMainWindow):
             producto = self.inventario.registrar_producto(
                 gtin=datos['gtin'],
                 nombre=datos['nombre'],
-                laboratorio=None,
                 descripcion=datos['descripcion']
             )
 
@@ -1410,7 +2254,7 @@ class VentanaPrincipal(QMainWindow):
     
     def registrar_entrada(self):
         """Registra una entrada de stock desde la GUI"""
-        gtin, ok = QInputDialog.getText(self, "Entrada de Stock", "Ingresa GTIN del producto:")
+        gtin, ok = QInputDialog.getText(self, "Entrada de Stock", "Ingresa el Barcode del producto:")
         if not ok or not gtin.strip():
             return
         producto = self.inventario.obtener_producto_por_gtin(gtin.strip())
@@ -1445,7 +2289,7 @@ class VentanaPrincipal(QMainWindow):
     
     def registrar_salida(self):
         """Registra una salida de stock desde la GUI"""
-        gtin, ok = QInputDialog.getText(self, "Salida de Stock", "Ingresa GTIN del producto:")
+        gtin, ok = QInputDialog.getText(self, "Salida de Stock", "Ingresa el Barcode del producto:")
         if not ok or not gtin.strip():
             return
         producto = self.inventario.obtener_producto_por_gtin(gtin.strip())
@@ -1485,7 +2329,7 @@ class VentanaPrincipal(QMainWindow):
         """Agrega un producto al carrito desde GUI"""
         gtin = self.entrada_gtin_pos.text().strip()
         if not gtin:
-            QMessageBox.warning(self, "Validación", "Ingresa un GTIN")
+            QMessageBox.warning(self, "Validación", "Ingresa un Barcode")
             return
 
         producto = self.inventario.obtener_producto_por_gtin(gtin)
@@ -1601,18 +2445,33 @@ class VentanaPrincipal(QMainWindow):
             dialogo.metodo_seleccionado = metodo
             dialogo.accept()
 
-        dialogo.keyPressEvent = lambda event: (
-            seleccionar_metodo("efectivo") if event.key() == Qt.Key_1 else (
-                seleccionar_metodo("transferencia") if event.key() == Qt.Key_2 else QDialog.keyPressEvent(dialogo, event)
-            )
-        )
+        metodos_teclado = {
+            Qt.Key_1: "efectivo",
+            Qt.Key_2: "transferencia",
+            Qt.Key_3: "tarjeta",
+        }
+
+        def procesar_tecla(event):
+            metodo_tecla = metodos_teclado.get(event.key())
+            if metodo_tecla in obtener_metodos_pago_disponibles():
+                seleccionar_metodo(metodo_tecla)
+            else:
+                QDialog.keyPressEvent(dialogo, event)
+
+        dialogo.keyPressEvent = procesar_tecla
 
         layout = QVBoxLayout(dialogo)
         label = QLabel("Selecciona una opción:")
         layout.addWidget(label)
 
         botones_layout = QHBoxLayout()
-        for metodo, texto in [("efectivo", "[1] Efectivo"), ("transferencia", "[2] Transferencia")]:
+        etiquetas_pago = {
+            "efectivo": "[1] Efectivo",
+            "transferencia": "[2] Transferencia",
+            "tarjeta": "[3] Tarjeta",
+        }
+        for metodo in obtener_metodos_pago_disponibles():
+            texto = etiquetas_pago[metodo]
             boton = QPushButton(texto)
             boton.clicked.connect(lambda checked=False, m=metodo: seleccionar_metodo(m))
             botones_layout.addWidget(boton)
@@ -1625,7 +2484,7 @@ class VentanaPrincipal(QMainWindow):
 
         metodo = dialogo.metodo_seleccionado
         if metodo is None:
-            QMessageBox.warning(self, "Error", "Selecciona una opción válida: 1 o 2")
+            QMessageBox.warning(self, "Error", "Selecciona un método de pago disponible.")
             return
 
         efectivo_recibido = None
@@ -1648,7 +2507,8 @@ class VentanaPrincipal(QMainWindow):
                 QMessageBox.warning(self, "Pago insuficiente", str(error))
                 return
 
-        usuario = "Sistema"
+        usuario_actual = getattr(self, "usuario_actual", None)
+        usuario = usuario_actual.nombre if usuario_actual else "Sistema"
 
         numero_ticket = self.pos.generar_numero_ticket()
         venta = self.pos.crear_venta(
@@ -1798,7 +2658,7 @@ class DialogoNuevoProducto(QDialog):
 
         self.campo_gtin = QLineEdit()
         self.campo_gtin.setPlaceholderText("Escanea o escribe el código de barras")
-        self.campo_gtin.setAccessibleName("GTIN obligatorio")
+        self.campo_gtin.setAccessibleName("Barcode obligatorio")
         self.campo_nombre = QLineEdit()
         self.campo_nombre.setPlaceholderText("Ej. Jabón líquido")
         self.campo_nombre.setAccessibleName("Nombre del producto obligatorio")
@@ -1817,7 +2677,7 @@ class DialogoNuevoProducto(QDialog):
         self.campo_stock_inicial.setSuffix(" unidades")
         self.campo_stock_inicial.setToolTip("Cantidad disponible al registrar el producto")
 
-        form.addRow("GTIN *", self.campo_gtin)
+        form.addRow("Barcode *", self.campo_gtin)
         form.addRow("Nombre *", self.campo_nombre)
         form.addRow("Descripción:", self.campo_descripcion)
         form.addRow("Precio de venta *:", self.campo_precio)
@@ -1841,7 +2701,7 @@ class DialogoNuevoProducto(QDialog):
 
     def validar_y_aceptar(self):
         if not self.campo_gtin.text().strip():
-            QMessageBox.warning(self, "Validación", "El GTIN es obligatorio.")
+            QMessageBox.warning(self, "Validación", "El Barcode es obligatorio.")
             return
         if not self.campo_nombre.text().strip():
             QMessageBox.warning(self, "Validación", "El nombre del producto es obligatorio.")
@@ -1894,18 +2754,15 @@ class DialogoEditarProducto(QDialog):
         self.campo_descripcion = QPlainTextEdit(producto.descripcion or "")
         self.campo_descripcion.setPlaceholderText("Detalles adicionales (opcional)")
         self.campo_descripcion.setMaximumHeight(76)
-        self.campo_laboratorio = QLineEdit(producto.laboratorio or "")
-        self.campo_laboratorio.setPlaceholderText("Laboratorio o fabricante (opcional)")
         self.campo_precio_venta = QDoubleSpinBox()
         self.campo_precio_venta.setRange(1, 1000000)
         self.campo_precio_venta.setDecimals(0)
         self.campo_precio_venta.setValue(presentacion.precio_venta)
         self.campo_precio_venta.setPrefix(f"{MONEDA} ")
 
-        form.addRow("GTIN *", self.campo_gtin)
+        form.addRow("Barcode *", self.campo_gtin)
         form.addRow("Nombre *", self.campo_nombre)
         form.addRow("Descripción:", self.campo_descripcion)
-        form.addRow("Laboratorio:", self.campo_laboratorio)
         form.addRow(f"Precio de venta ({presentacion.tipo.value}):", self.campo_precio_venta)
         layout.addLayout(form)
 
@@ -1919,7 +2776,7 @@ class DialogoEditarProducto(QDialog):
 
     def validar_y_aceptar(self):
         if not self.campo_gtin.text().strip():
-            QMessageBox.warning(self, "Validación", "El GTIN es obligatorio.")
+            QMessageBox.warning(self, "Validación", "El Barcode es obligatorio.")
             return
         if not self.campo_nombre.text().strip():
             QMessageBox.warning(self, "Validación", "El nombre del producto es obligatorio.")
@@ -1931,7 +2788,6 @@ class DialogoEditarProducto(QDialog):
             "gtin": self.campo_gtin.text().strip(),
             "nombre": self.campo_nombre.text().strip(),
             "descripcion": self.campo_descripcion.toPlainText().strip(),
-            "laboratorio": self.campo_laboratorio.text().strip() or None,
             "precio_venta": self.campo_precio_venta.value(),
         }
 
@@ -2037,14 +2893,14 @@ class DialogoAsignarProductos(QDialog):
         layout.addWidget(indicacion)
 
         self.busqueda = QLineEdit()
-        self.busqueda.setPlaceholderText("Buscar por nombre o GTIN...")
+        self.busqueda.setPlaceholderText("Buscar por nombre o Barcode...")
         self.busqueda.setClearButtonEnabled(True)
         layout.addWidget(self.busqueda)
 
         self.lista_productos = QListWidget()
         productos_actuales = {producto.id for producto in proveedor.productos}
         for producto in productos:
-            elemento = QListWidgetItem(f"{producto.nombre}  ·  GTIN {producto.gtin}")
+            elemento = QListWidgetItem(f"{producto.nombre}  ·  Barcode {producto.gtin}")
             elemento.setData(Qt.UserRole, producto.id)
             elemento.setFlags(elemento.flags() | Qt.ItemIsUserCheckable)
             elemento.setCheckState(

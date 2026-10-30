@@ -94,7 +94,7 @@ def crear_tablas():
         return False
 
 def crear_usuario_administrador():
-    """Crea un usuario administrador por defecto"""
+    """Configura el primer administrador sin credenciales predeterminadas."""
     print("\n" + "=" * 70)
     print("👤 CREAR USUARIO ADMINISTRADOR".center(70))
     print("=" * 70 + "\n")
@@ -102,37 +102,28 @@ def crear_usuario_administrador():
     try:
         from database.connection import SessionLocal
         from database.models import Usuario
-        
+
         db = SessionLocal()
-        
-        # Verificar si ya existe admin
-        admin = db.query(Usuario).filter(Usuario.rol == "admin").first()
-        if admin:
-            print("⚠️ Usuario administrador ya existe")
-            db.close()
-            return True
-        
-        # Crear admin
-        admin = Usuario(
-            nombre="Administrador",
-            email="admin@tienda.local",
-            rol="admin",
-            activo=True
-        )
-        
-        db.add(admin)
-        db.commit()
-        
-        print("✅ Usuario administrador creado:")
-        print(f"   Nombre: {admin.nombre}")
-        print(f"   Email: {admin.email}")
-        print(f"   Rol: {admin.rol}")
-        
+        admin = db.query(Usuario).filter(
+            Usuario.rol == "admin",
+            Usuario.activo.is_(True),
+            Usuario.password_hash.isnot(None),
+        ).first()
         db.close()
+        if admin:
+            print("⚠️ Ya existe un administrador con contraseña configurada")
+            return True
+
+        from core.auth import configurar_administrador_interactivo
+
+        configurar_administrador_interactivo()
         return True
-    
+
+    except (ValueError, RuntimeError) as e:
+        logger.error("❌ No se pudo configurar el administrador: %s", e)
+        return False
     except Exception as e:
-        logger.error(f"❌ Error al crear usuario: {e}")
+        logger.error(f"❌ Error al configurar usuario administrador: {e}")
         return False
 
 def obtener_productos_demo_tienda_escolar():
@@ -143,7 +134,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Paleta de fresa",
             "categoria": "dulces",
             "caracteristicas": "Caramelo macizo sabor fresa 20g",
-            "laboratorio": "Dulces Coronado",
             "presentaciones": [
                 {"tipo": "unidad", "cantidad": 1, "precio_unitario": 5, "precio_venta": 10, "stock": 80}
             ]
@@ -153,7 +143,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Chocolate con leche 30g",
             "categoria": "dulces",
             "caracteristicas": "Tableta de chocolate con leche",
-            "laboratorio": "Nestle",
             "presentaciones": [
                 {"tipo": "unidad", "cantidad": 1, "precio_unitario": 12, "precio_venta": 22, "stock": 50}
             ]
@@ -163,7 +152,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Gomitas frutales 50g",
             "categoria": "dulces",
             "caracteristicas": "Gomitas surtidas de frutas",
-            "laboratorio": "Ricolino",
             "presentaciones": [
                 {"tipo": "bolsa", "cantidad": 1, "precio_unitario": 8, "precio_venta": 15, "stock": 60}
             ]
@@ -173,7 +161,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Cuaderno Profesional 100 Hojas",
             "categoria": "papeleria",
             "caracteristicas": "Cuadrícula chica pasta dura",
-            "laboratorio": "Scribe",
             "presentaciones": [
                 {"tipo": "unidad", "cantidad": 1, "precio_unitario": 20, "precio_venta": 45, "stock": 40}
             ]
@@ -183,7 +170,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Lápiz Grafito 2B",
             "categoria": "papeleria",
             "caracteristicas": "Madera reforestada grafito HB",
-            "laboratorio": "Dixon",
             "presentaciones": [
                 {"tipo": "unidad", "cantidad": 1, "precio_unitario": 4, "precio_venta": 10, "stock": 100}
             ]
@@ -193,7 +179,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Bolígrafo Tinta Negra",
             "categoria": "papeleria",
             "caracteristicas": "Punto mediano 1.0mm",
-            "laboratorio": "BIC",
             "presentaciones": [
                 {"tipo": "unidad", "cantidad": 1, "precio_unitario": 5, "precio_venta": 12, "stock": 120}
             ]
@@ -203,7 +188,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Goma de borrar blanca",
             "categoria": "papeleria",
             "caracteristicas": "Libre de látex no mancha",
-            "laboratorio": "Pelikan",
             "presentaciones": [
                 {"tipo": "unidad", "cantidad": 1, "precio_unitario": 6, "precio_venta": 15, "stock": 70}
             ]
@@ -213,7 +197,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Regla flexible 30cm",
             "categoria": "papeleria",
             "caracteristicas": "Plástico flexible graduado",
-            "laboratorio": "Mae",
             "presentaciones": [
                 {"tipo": "unidad", "cantidad": 1, "precio_unitario": 8, "precio_venta": 18, "stock": 35}
             ]
@@ -223,7 +206,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Sacapuntas con depósito",
             "categoria": "papeleria",
             "caracteristicas": "Cuchilla de acero con depósito",
-            "laboratorio": "Maped",
             "presentaciones": [
                 {"tipo": "unidad", "cantidad": 1, "precio_unitario": 7, "precio_venta": 16, "stock": 45}
             ]
@@ -233,7 +215,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Pegamento adhesivo en barra 22g",
             "categoria": "papeleria",
             "caracteristicas": "Fórmula lavable no tóxica",
-            "laboratorio": "Pritt",
             "presentaciones": [
                 {"tipo": "unidad", "cantidad": 1, "precio_unitario": 14, "precio_venta": 28, "stock": 50}
             ]
@@ -243,7 +224,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Tijeras escolares punta roma",
             "categoria": "papeleria",
             "caracteristicas": "Acero inoxidable seguras",
-            "laboratorio": "Barrilito",
             "presentaciones": [
                 {"tipo": "unidad", "cantidad": 1, "precio_unitario": 12, "precio_venta": 25, "stock": 30}
             ]
@@ -253,7 +233,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Agua purificada 500ml",
             "categoria": "bebidas",
             "caracteristicas": "Botella de agua purificada",
-            "laboratorio": "Ciel",
             "presentaciones": [
                 {"tipo": "botella", "cantidad": 1, "precio_unitario": 6, "precio_venta": 12, "stock": 90}
             ]
@@ -263,7 +242,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Jugo de manzana 200ml",
             "categoria": "bebidas",
             "caracteristicas": "Jugo natural sin azúcar añadida",
-            "laboratorio": "Del Valle",
             "presentaciones": [
                 {"tipo": "unidad", "cantidad": 1, "precio_unitario": 9, "precio_venta": 18, "stock": 60}
             ]
@@ -273,7 +251,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Papas fritas con sal 45g",
             "categoria": "snacks",
             "caracteristicas": "Papas crujientes saladas",
-            "laboratorio": "Sabritas",
             "presentaciones": [
                 {"tipo": "bolsa", "cantidad": 1, "precio_unitario": 13, "precio_venta": 24, "stock": 40}
             ]
@@ -283,7 +260,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Galletas con chispas de chocolate",
             "categoria": "snacks",
             "caracteristicas": "Paquete con 6 galletas",
-            "laboratorio": "Gamesa",
             "presentaciones": [
                 {"tipo": "unidad", "cantidad": 1, "precio_unitario": 10, "precio_venta": 20, "stock": 55}
             ]
@@ -293,7 +269,6 @@ def obtener_productos_demo_tienda_escolar():
             "nombre": "Barra de cereal con avena",
             "categoria": "snacks",
             "caracteristicas": "Avena y miel 38g",
-            "laboratorio": "Quaker",
             "presentaciones": [
                 {"tipo": "unidad", "cantidad": 1, "precio_unitario": 8, "precio_venta": 16, "stock": 40}
             ]
@@ -326,7 +301,6 @@ def cargar_datos_iniciales():
             producto = gestor.registrar_producto(
                 gtin=prod['gtin'],
                 nombre=prod['nombre'],
-                laboratorio=prod.get('laboratorio'),
                 descripcion=prod.get('caracteristicas')
             )
             
@@ -356,25 +330,27 @@ def mostrar_resumen():
     print("=" * 70)
     
     print("\n📋 Próximos pasos:")
-    print("1. Ejecuta: python main.py")
-    print("2. Selecciona tu interfaz preferida:")
-    print("   - Terminal (1): Para escaneo rápido")
-    print("   - GUI (2): Para interfaz visual")
-    print("   - Web (3): Para múltiples usuarios")
+    print("1. Ejecuta 'python main.py' para abrir la interfaz gráfica.")
+    print("2. Otras interfaces:")
+    print("   - Terminal: python -m ui.terminal_ui")
+    print("   - Dashboard: python main.py --reportes")
+    print("   - Web: python -m web.app (http://localhost:5000)")
     
     print("\n📚 Documentación:")
     print("- README.md: Guía general")
     print("- FAQ.md: Preguntas frecuentes")
     
     print("\n💡 Consejos:")
-    print("- Ten XAMPP corriendo con MySQL activo")
-    print("- Personaliza .env según tu configuración")
+    print("- SQLite es la base de datos predeterminada; MySQL es opcional.")
+    print("- Personaliza .env según tu configuración.")
     print("- Haz backups regularmente")
     
     print("\n" + "=" * 70 + "\n")
 
 def main():
     """Función principal"""
+    from config.settings import AUTENTICACION_HABILITADA
+
     print("\n📦 INICIALIZADOR DEL SISTEMA DE INVENTARIO GENERAL\n")
     
     # Validar ambiente
@@ -388,8 +364,10 @@ def main():
         print("\n❌ Fallo la creación de tablas. Verifica tu configuración.")
         sys.exit(1)
     
-    # Crear usuario admin
-    crear_usuario_administrador()
+    if AUTENTICACION_HABILITADA:
+        crear_usuario_administrador()
+    else:
+        print("Autenticación desactivada; se omite la configuración de usuarios.")
     
     # Cargar datos iniciales
     cargar_datos_iniciales()

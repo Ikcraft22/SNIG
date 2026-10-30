@@ -12,9 +12,9 @@ import math
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
+from config.settings import obtener_metodos_pago_disponibles
 from database.models import (
-    Venta, VentaItem, Presentacion, Producto,
-    EstadoVenta, MovimientoInventario, EstadoMovimiento,
+    Venta, VentaItem, Presentacion, EstadoVenta, MovimientoInventario, EstadoMovimiento,
     registrar_evento_sync, serializar_entidad_sync,
 )
 
@@ -218,7 +218,7 @@ class GestorPOS:
         
         Args:
             numero_ticket: Número único del ticket
-            metodo_pago: Método de pago (efectivo, tarjeta, etc.)
+            metodo_pago: Método de pago habilitado en la configuración
             usuario: Usuario/cajero que realiza la venta
             notas: Notas adicionales
             
@@ -231,7 +231,7 @@ class GestorPOS:
         if not isinstance(numero_ticket, str) or not numero_ticket.strip():
             logger.warning("⚠️ El número de ticket es obligatorio")
             return None
-        if metodo_pago not in {"efectivo", "tarjeta", "transferencia"}:
+        if metodo_pago not in obtener_metodos_pago_disponibles():
             logger.warning(f"⚠️ Método de pago inválido: {metodo_pago}")
             return None
 
@@ -422,15 +422,22 @@ class GestorPOS:
             "metodos_pago": {k: round(v) for k, v in metodos_pago.items()}
         }
 
-    def obtener_metricas_cierre_caja(self, fecha: str) -> Dict[str, Any]:
+    def obtener_metricas_cierre_caja(
+        self,
+        fecha: str,
+        usuario: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Obtiene las métricas consolidadas para arqueo y cierre de caja en una fecha (YYYY-MM-DD).
         """
         fecha_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
-        ventas = self.db.query(Venta).filter(
+        consulta = self.db.query(Venta).filter(
             Venta.fecha >= datetime.combine(fecha_obj, datetime.min.time()),
             Venta.fecha <= datetime.combine(fecha_obj, datetime.max.time())
-        ).all()
+        )
+        if usuario is not None:
+            consulta = consulta.filter(Venta.usuario == usuario)
+        ventas = consulta.all()
 
         total_ingresos = sum(v.total for v in ventas)
         cantidad_ventas = len(ventas)
@@ -473,11 +480,26 @@ class GestorPOS:
             for v in ventas
         ]
 
-    def obtener_resumen_por_cajero(self) -> Dict[str, Dict[str, Any]]:
+    def obtener_resumen_por_cajero(
+        self,
+        fecha: Optional[str] = None,
+        usuario: Optional[str] = None,
+    ) -> Dict[str, Dict[str, Any]]:
         """
         Genera un resumen consolidado de ventas acumuladas por cada cajero/usuario.
+
+        Si se indica una fecha (YYYY-MM-DD), limita el resumen a ese día.
         """
-        ventas = self.db.query(Venta).all()
+        consulta = self.db.query(Venta)
+        if fecha is not None:
+            fecha_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
+            consulta = consulta.filter(
+                Venta.fecha >= datetime.combine(fecha_obj, datetime.min.time()),
+                Venta.fecha <= datetime.combine(fecha_obj, datetime.max.time()),
+            )
+        if usuario is not None:
+            consulta = consulta.filter(Venta.usuario == usuario)
+        ventas = consulta.all()
         resumen = {}
         for v in ventas:
             user = v.usuario or "Sistema"

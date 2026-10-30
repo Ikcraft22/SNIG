@@ -57,6 +57,13 @@ def create_tables():
             with engine.connect() as connection:
                 connection.exec_driver_sql("PRAGMA journal_mode=WAL")
         Base.metadata.create_all(bind=engine)
+        from database.migrations import (
+            asegurar_columna_password_hash,
+            eliminar_datos_farmaceuticos,
+        )
+
+        asegurar_columna_password_hash(engine)
+        eliminar_datos_farmaceuticos(engine)
         logger.info("✅ Tablas creadas exitosamente")
     except Exception as e:
         logger.error(f"❌ Error al crear tablas: {e}")

@@ -14,7 +14,6 @@ import shutil
 import csv
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from pathlib import Path
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from database.models import (
@@ -22,7 +21,7 @@ from database.models import (
     EstadoMovimiento, TipoPresentacion, registrar_evento_sync, serializar_entidad_sync
 )
 from api.gtin_lookup import GTINBuscador
-from config.settings import SQLITE_FILE, BASE_DIR
+from config.settings import BASE_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,6 @@ class GestorInventario:
         self,
         gtin: str,
         nombre: str,
-        laboratorio: str = None,
         descripcion: str = None
     ) -> Optional[Producto]:
         """
@@ -52,7 +50,6 @@ class GestorInventario:
         Args:
             gtin: Código GTIN del producto
             nombre: Nombre del producto
-            laboratorio: Laboratorio fabricante
             descripcion: Descripción del producto
             
         Returns:
@@ -78,7 +75,6 @@ class GestorInventario:
             producto = Producto(
                 gtin=gtin,
                 nombre=nombre,
-                laboratorio=laboratorio,
                 descripcion=descripcion
             )
             
@@ -277,7 +273,6 @@ class GestorInventario:
         producto_id: int,
         gtin: str,
         nombre: str,
-        laboratorio: Optional[str] = None,
         descripcion: Optional[str] = None,
         presentacion_id: Optional[int] = None,
         precio_venta: Optional[float] = None,
@@ -323,7 +318,6 @@ class GestorInventario:
 
             producto.gtin = gtin
             producto.nombre = nombre
-            producto.laboratorio = laboratorio.strip() if laboratorio else None
             producto.descripcion = descripcion.strip() if descripcion else None
             self.db.commit()
             logger.info(f"✅ Producto actualizado: {producto_id} - {nombre}")
@@ -344,7 +338,7 @@ class GestorInventario:
     def buscar_productos(self, termino: str) -> List[Producto]:
         """
         Realiza una búsqueda inteligente e insensible a mayúsculas/minúsculas.
-        Busca por nombre, GTIN, laboratorio o descripción.
+        Busca por nombre, GTIN o descripción.
 
         Args:
             termino: Texto de búsqueda
@@ -360,9 +354,7 @@ class GestorInventario:
             or_(
                 Producto.nombre.ilike(t),
                 Producto.gtin.ilike(t),
-                Producto.laboratorio.ilike(t),
                 Producto.descripcion.ilike(t),
-                Producto.principio_activo.ilike(t),
             )
         ).all()
     
@@ -536,7 +528,7 @@ class GestorInventario:
             with open(ruta_archivo, mode="w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
                 writer.writerow([
-                    "gtin", "nombre", "laboratorio", "descripcion",
+                    "gtin", "nombre", "descripcion",
                     "tipo_presentacion", "cantidad", "precio_costo",
                     "precio_venta", "stock_actual", "stock_minimo", "codigo_interno"
                 ])
@@ -544,14 +536,14 @@ class GestorInventario:
                     if p.presentaciones:
                         for pres in p.presentaciones:
                             writer.writerow([
-                                p.gtin, p.nombre, p.laboratorio or "", p.descripcion or "",
+                                p.gtin, p.nombre, p.descripcion or "",
                                 pres.tipo.value, pres.cantidad, pres.precio_unitario,
                                 pres.precio_venta, pres.stock_actual, pres.stock_minimo,
                                 pres.codigo_interno or ""
                             ])
                     else:
                         writer.writerow([
-                            p.gtin, p.nombre, p.laboratorio or "", p.descripcion or "",
+                            p.gtin, p.nombre, p.descripcion or "",
                             "", "", "", "", "", "", ""
                         ])
             logger.info(f"✅ Catálogo exportado exitosamente a CSV: {ruta_archivo}")
@@ -574,7 +566,6 @@ class GestorInventario:
                         filas.append({
                             "GTIN": p.gtin,
                             "Producto": p.nombre,
-                            "Laboratorio / Marca": p.laboratorio or "",
                             "Descripción": p.descripcion or "",
                             "Presentación": pres.tipo.value,
                             "Unidades x Envase": pres.cantidad,
@@ -588,7 +579,6 @@ class GestorInventario:
                     filas.append({
                         "GTIN": p.gtin,
                         "Producto": p.nombre,
-                        "Laboratorio / Marca": p.laboratorio or "",
                         "Descripción": p.descripcion or "",
                         "Presentación": "",
                         "Unidades x Envase": "",
@@ -629,7 +619,6 @@ class GestorInventario:
                             detalles_errores.append(f"Fila {num_fila}: GTIN o nombre vacío")
                             continue
 
-                        laboratorio = row.get("laboratorio", "").strip() or None
                         descripcion = row.get("descripcion", "").strip() or None
 
                         # Buscar o registrar producto
@@ -638,13 +627,10 @@ class GestorInventario:
                             producto = self.registrar_producto(
                                 gtin=gtin,
                                 nombre=nombre,
-                                laboratorio=laboratorio,
                                 descripcion=descripcion
                             )
                         else:
                             producto.nombre = nombre
-                            if laboratorio:
-                                producto.laboratorio = laboratorio
                             if descripcion:
                                 producto.descripcion = descripcion
                             self.db.commit()

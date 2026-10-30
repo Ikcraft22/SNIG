@@ -54,7 +54,6 @@ def test_actualizar_producto_edita_datos_y_precio_sin_cambiar_stock(inventario_d
         producto_id=producto.id,
         gtin=" 1234567890124 ",
         nombre=" Nombre actualizado ",
-        laboratorio="Laboratorio",
         descripcion="Descripción",
         presentacion_id=presentacion.id,
         precio_venta=6,
@@ -65,7 +64,6 @@ def test_actualizar_producto_edita_datos_y_precio_sin_cambiar_stock(inventario_d
     inventario_db.refresh(presentacion)
     assert producto.gtin == "1234567890124"
     assert producto.nombre == "Nombre actualizado"
-    assert producto.laboratorio == "Laboratorio"
     assert producto.descripcion == "Descripción"
     assert presentacion.precio_venta == 6
     assert presentacion.precio_unitario == 4.5
@@ -124,7 +122,6 @@ def test_dialogos_de_producto_solo_aceptan_precios_enteros():
         gtin="1234567890123",
         nombre="Producto",
         descripcion="",
-        laboratorio="",
     )
     presentacion = SimpleNamespace(
         precio_venta=5,
@@ -137,6 +134,17 @@ def test_dialogos_de_producto_solo_aceptan_precios_enteros():
     assert dialogo_nuevo.campo_precio.decimals() == 0
     assert dialogo_editar.campo_precio_venta.decimals() == 0
     assert dialogo_nuevo.campo_gtin.placeholderText()
+    assert "Registra un producto" in {
+        label.text() for label in dialogo_nuevo.findChildren(gui_ui.QLabel)
+    }
+    assert any(
+        label.text() == "Barcode *"
+        for label in dialogo_nuevo.findChildren(gui_ui.QLabel)
+    )
+    assert any(
+        label.text() == "Barcode *"
+        for label in dialogo_editar.findChildren(gui_ui.QLabel)
+    )
     assert dialogo_nuevo.campo_stock_inicial.suffix() == " unidades"
     dialogo_nuevo.campo_gtin.setText("1234567890123")
     dialogo_nuevo.campo_nombre.setText("Producto nuevo")

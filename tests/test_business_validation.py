@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from core.inventory_manager import GestorInventario
 from core.pos_manager import GestorPOS
 from database.connection import Base
-from database.models import Presentacion, Producto, SyncChange, TipoPresentacion
+from database.models import Presentacion, Producto, SyncChange, TipoPresentacion, Venta
 
 
 @pytest.fixture
@@ -132,6 +132,32 @@ def test_pos_no_vende_stock_insuficiente_ni_metodo_de_pago_desconocido(db_sessio
     pos.carrito.agregar_item(producto.id, presentacion.id, 1, 10)
     assert pos.crear_venta("TK-TEST-2", "cheque", "cajero") is None
     assert db_session.query(Presentacion).filter_by(id=presentacion.id).one().stock_actual == 1
+
+
+def test_pos_rechaza_tarjeta_deshabilitada_sin_descontar_stock(db_session, monkeypatch):
+    from config import settings
+
+    monkeypatch.setattr(settings, "PAGO_TARJETA_HABILITADO", False)
+    producto = Producto(gtin="750000000009", nombre="Producto de prueba")
+    db_session.add(producto)
+    db_session.flush()
+    presentacion = Presentacion(
+        producto_id=producto.id,
+        tipo=TipoPresentacion.UNIDAD,
+        cantidad=1,
+        precio_unitario=5,
+        precio_venta=10,
+        stock_actual=2,
+    )
+    db_session.add(presentacion)
+    db_session.commit()
+
+    pos = GestorPOS(db_session)
+    pos.carrito.agregar_item(producto.id, presentacion.id, 1, 10)
+
+    assert pos.crear_venta("TK-TARJETA-DESHABILITADA", "tarjeta", "cajero") is None
+    assert db_session.query(Presentacion).filter_by(id=presentacion.id).one().stock_actual == 2
+    assert db_session.query(Venta).count() == 0
 
 
 def test_carrito_rechaza_precios_y_cantidades_invalidos():

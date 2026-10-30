@@ -5,7 +5,7 @@ from PyInstaller.utils.hooks import collect_all
 streamlit_datas, streamlit_binaries, streamlit_hiddenimports = collect_all("streamlit")
 datas = streamlit_datas + [
     ("Icono.jpeg", "."),
-    ("Icono.ico", "."),
+    ("Logo.ico", "."),
     ("ui/assets", "ui/assets"),
     ("reporting/streamlit_reports.py", "reporting"),
     ("reporting/pdf_export.py", "reporting"),
@@ -47,7 +47,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=["Icono.ico"],
+    icon=["Logo.ico"],
 )
 coll = COLLECT(
     exe,

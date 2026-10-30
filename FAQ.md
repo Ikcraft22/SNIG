@@ -21,6 +21,8 @@ La interfaz gráfica se abre directamente. Para iniciar otros componentes:
 
 La interfaz de terminal sigue disponible mediante el módulo `ui.terminal_ui`.
 
+Por ahora, se omite el panel de inicio de sesión y la gestión de usuarios está desactivada. Las cuentas y sus hashes se conservan. Para reactivar ambas funciones, cambia `AUTENTICACION_HABILITADA = False` a `True` en `config/settings.py` y reinicia. Si usas el ejecutable de Windows, vuelve a generar el build con PyInstaller. Si no hay administrador configurado, ejecuta `python init_db.py` o crea uno con `python -m core.auth --crear-admin Administrador`.
+
 ## ¿Qué base de datos usa por defecto?
 
 SQLite. El archivo de base de datos se genera como:
@@ -38,9 +40,13 @@ SQLITE_FILE=./inventario.db
 
 ## ¿Cómo abrir la interfaz web?
 
-1. ejecuta la aplicación
-2. selecciona la opción 3
-3. abre en el navegador la URL:
+Inicia Flask desde la raíz del proyecto:
+
+```bash
+python -m web.app
+```
+
+Luego abre la URL en el navegador:
 
 ```text
 http://localhost:5000
@@ -54,13 +60,21 @@ Normalmente es por falta de PyQt5. Instálalo con:
 pip install PyQt5
 ```
 
+## ¿Qué significa Barcode?
+
+La interfaz muestra **Barcode** donde antes se mostraba GTIN. En esta documentación se indica como **Barcode (GTIN)**; el campo interno de la base de datos y la API sigue llamándose `gtin`.
+
 ## ¿Cómo funciona el POS?
 
-En la sección **Punto de venta** puedes escribir o escanear un GTIN y presionar Enter para agregar el producto directamente al carrito. Se puede pagar en Efectivo o por Transferencia; los botones también aceptan las teclas `1` y `2`. Si se repite el mismo producto 10 veces seguidas, el sistema muestra una alerta de compra masiva.
+En la sección **Punto de venta** puedes escribir o escanear el Barcode (GTIN) y presionar Enter para agregar el producto directamente al carrito. Se puede pagar en Efectivo o por Transferencia; los botones también aceptan las teclas `1` y `2`. Si se repite el mismo producto 10 veces seguidas, el sistema muestra una alerta de compra masiva.
+
+## ¿Por qué no puedo pagar con tarjeta?
+
+El pago con tarjeta está desactivado temporalmente en las interfaces y el backend rechaza nuevas ventas con ese método. Los pagos históricos con tarjeta se conservan y siguen apareciendo en los reportes. Para reactivarlo en GUI, terminal, web y API, cambia `PAGO_TARJETA_HABILITADO = False` a `PAGO_TARJETA_HABILITADO = True` en `config/settings.py` y reinicia SNIG. Para el ejecutable de Windows, genera un build actualizado.
 
 ## ¿Cómo registro un proveedor y le asigno productos?
 
-Abre **Proveedores** desde la navegación lateral, pulsa **Nuevo proveedor** y completa el nombre y los datos de contacto disponibles. Después selecciona al proveedor, elige **Asignar productos**, busca por nombre o GTIN y marca los productos que suministra. La columna **Proveedor** del inventario muestra las asignaciones. Eliminar al proveedor no elimina los productos.
+Abre **Proveedores** desde la navegación lateral, pulsa **Nuevo proveedor** y completa el nombre y los datos de contacto disponibles. Después selecciona al proveedor, elige **Asignar productos**, busca por nombre o Barcode (GTIN) y marca los productos que suministra. La columna **Proveedor** del inventario muestra las asignaciones. Eliminar al proveedor no elimina los productos.
 
 ## ¿La interfaz está preparada para pantallas táctiles?
 
@@ -85,7 +99,18 @@ MYSQL_DATABASE=inventario_general
 
 ## ¿La base de datos se crea sola?
 
-Sí. Al iniciar la aplicación se inicializa la estructura de tablas automáticamente.
+Sí. Al iniciar la aplicación se inicializa la estructura de tablas automáticamente. Si la base ya existía, se añade `usuarios.password_hash` de forma aditiva y se conservan los registros existentes.
+
+## ¿Se sincronizan automáticamente varias sucursales?
+
+No. La API ofrece un feed incremental de solo lectura (`GET /api/sync/cursor` y `GET /api/sync/changes`), pero aún no hay cliente para aplicar/enviar cambios, sincronización inicial ni resolución de conflictos. Los endpoints no tienen autenticación, así que no deben exponerse en redes no confiables.
+
+## ¿Qué permisos tienen los roles?
+
+Los roles están temporalmente desactivados junto con el login. Al reactivar `AUTENTICACION_HABILITADA` en `config/settings.py`, se aplican estos permisos:
+- **Cajero**: Inicio, POS y cierre de su propio turno.
+- **Inventario**: Inicio, Inventario y Proveedores.
+- **Admin**: todas las secciones, métricas financieras y gestión de usuarios.
 
 ## ¿Cómo abro el dashboard interactivo de reportes con gráficas (Streamlit)?
 
@@ -127,4 +152,4 @@ La aplicación guarda automáticamente la preferencia en el archivo local `.star
 - `web/app.py`: rutas y API web con Flask
 - `database/models.py`: modelos de datos SQLAlchemy
 
-**Última actualización**: 23 de octubre de 2026
+**Última actualización**: 26 de octubre de 2026

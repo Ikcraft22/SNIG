@@ -60,7 +60,7 @@
 
             <div class="search-box" role="search">
                 <label class="visually-hidden" for="catalog-search">Buscar producto</label>
-                <input id="catalog-search" type="text" placeholder="Busca por nombre o GTIN..." />
+                <input id="catalog-search" type="text" placeholder="Busca por nombre o Barcode..." />
                 <button type="button" id="btn-buscar-producto">Buscar</button>
             </div>
 
@@ -77,8 +77,15 @@
             <div id="cart-items" class="cart-items" aria-live="polite"></div>
 
             <div class="payment-methods" aria-label="Métodos de pago">
+                {% if 'efectivo' in metodos_pago %}
                 <button class="payment-method active" type="button" data-method="efectivo">Efectivo</button>
+                {% endif %}
+                {% if 'transferencia' in metodos_pago %}
                 <button class="payment-method" type="button" data-method="transferencia">Transferencia</button>
+                {% endif %}
+                {% if 'tarjeta' in metodos_pago %}
+                <button class="payment-method" type="button" data-method="tarjeta">Tarjeta</button>
+                {% endif %}
             </div>
 
             <div class="totals">
@@ -187,8 +194,7 @@
                     if (!query) return true;
                     const hayGtIn = (producto.gtin || '').toLowerCase().includes(query);
                     const hayNombre = (producto.nombre || '').toLowerCase().includes(query);
-                    const hayLaboratorio = (producto.laboratorio || '').toLowerCase().includes(query);
-                    return hayGtIn || hayNombre || hayLaboratorio;
+                    return hayGtIn || hayNombre;
                 });
 
                 const grid = document.getElementById('product-grid');

@@ -38,7 +38,6 @@ class GTINLookup:
                     return {
                         "gtin": gtin,
                         "nombre": data.get("product", {}).get("product_name", "Desconocido"),
-                        "marca": data.get("product", {}).get("brands", "Desconocida"),
                         "descripcion": data.get("product", {}).get("ingredients_text", ""),
                         "categoria": data.get("product", {}).get("categories", ""),
                         "fuente": "OpenFoodFacts",

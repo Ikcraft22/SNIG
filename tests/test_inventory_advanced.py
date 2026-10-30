@@ -24,19 +24,19 @@ def db_session():
 
 def test_busqueda_inteligente_productos(db_session):
     gestor = GestorInventario(db_session)
-    p1 = gestor.registrar_producto(gtin="750100000001", nombre="Cuaderno Profesional Rayado", laboratorio="Scribe", descripcion="100 hojas cuadricula")
-    p2 = gestor.registrar_producto(gtin="750100000002", nombre="Lápiz de Grafito HB", laboratorio="Dixon", descripcion="Madera de cedro")
-    p3 = gestor.registrar_producto(gtin="750100000003", nombre="Bolígrafo Azul Punto Medio", laboratorio="BIC", descripcion="Tinta indeleble")
+    p1 = gestor.registrar_producto(gtin="750100000001", nombre="Cuaderno Profesional Rayado", descripcion="100 hojas cuadricula")
+    p2 = gestor.registrar_producto(gtin="750100000002", nombre="Lápiz de Grafito HB", descripcion="Madera de cedro")
+    p3 = gestor.registrar_producto(gtin="750100000003", nombre="Bolígrafo Azul Punto Medio", descripcion="Tinta indeleble")
 
     # Búsqueda por parte del nombre sin distinción de mayúsculas/minúsculas
     resultados = gestor.buscar_productos("cuaderno")
     assert len(resultados) == 1
     assert resultados[0].id == p1.id
 
-    # Búsqueda por laboratorio
-    resultados_lab = gestor.buscar_productos("dixon")
-    assert len(resultados_lab) == 1
-    assert resultados_lab[0].id == p2.id
+    # Búsqueda por descripción
+    resultados_descripcion = gestor.buscar_productos("cedro")
+    assert len(resultados_descripcion) == 1
+    assert resultados_descripcion[0].id == p2.id
 
     # Búsqueda por GTIN parcial o completo
     resultados_gtin = gestor.buscar_productos("000003")
@@ -49,7 +49,7 @@ def test_busqueda_inteligente_productos(db_session):
 
 def test_calcular_valor_inventario_y_rentabilidad(db_session):
     gestor = GestorInventario(db_session)
-    p1 = gestor.registrar_producto(gtin="750100000010", nombre="Regla 30cm", laboratorio="Baco")
+    p1 = gestor.registrar_producto(gtin="750100000010", nombre="Regla 30cm")
     gestor.agregar_presentacion(
         producto_id=p1.id,
         tipo_presentacion="unidad",
@@ -59,7 +59,7 @@ def test_calcular_valor_inventario_y_rentabilidad(db_session):
         stock_inicial=20
     )
 
-    p2 = gestor.registrar_producto(gtin="750100000020", nombre="Goma de borrar", laboratorio="Pelikan")
+    p2 = gestor.registrar_producto(gtin="750100000020", nombre="Goma de borrar")
     gestor.agregar_presentacion(
         producto_id=p2.id,
         tipo_presentacion="unidad",
@@ -81,7 +81,7 @@ def test_calcular_valor_inventario_y_rentabilidad(db_session):
 
 def test_obtener_sugerencias_reabastecimiento(db_session):
     gestor = GestorInventario(db_session)
-    p = gestor.registrar_producto(gtin="750100000030", nombre="Sacapuntas metálico", laboratorio="Maped")
+    p = gestor.registrar_producto(gtin="750100000030", nombre="Sacapuntas metálico")
     # Stock mínimo 15, stock actual 3 -> en alerta
     pres = gestor.agregar_presentacion(
         producto_id=p.id,
@@ -105,7 +105,7 @@ def test_obtener_sugerencias_reabastecimiento(db_session):
 
 def test_exportar_e_importar_catalogo_csv(db_session):
     gestor = GestorInventario(db_session)
-    p = gestor.registrar_producto(gtin="750100000040", nombre="Pegamento en Barra", laboratorio="Pritt", descripcion="22g no tóxico")
+    p = gestor.registrar_producto(gtin="750100000040", nombre="Pegamento en Barra", descripcion="22g no tóxico")
     gestor.agregar_presentacion(
         producto_id=p.id,
         tipo_presentacion="unidad",
