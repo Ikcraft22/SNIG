@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+
+# Python y Entornos
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Pruebas y Cobertura
+.pytest_cache
+.coverage
+htmlcov/
+tests/
+
+# Bases de datos locales y archivos temporales
+*.db
+*.db-shm
+*.db-wal
+inventario.db
+.startup_state.json
+
+# Variables de entorno y secretos
+.env
+.env.*
+
+# Build artifacts e IDEs
+build/
+dist/
+*.egg-info
+.vscode/
+.idea/
+*.spec
+Icono.ico
+Logo.af

@@ -251,6 +251,26 @@ pip install flask
 - revisa .env
 - confirma que la base de datos existe
 
+## Despliegue con Docker
+
+El proyecto cuenta con configuración lista para ejecutarse en contenedores Docker (ideal para servidores y la API web):
+
+```bash
+# Construir la imagen
+docker build -t inventario-app .
+
+# Ejecutar el contenedor
+docker run -d \
+  -p 5000:5000 \
+  -e SYNC_API_TOKEN="tu_token_aqui" \
+  -e SYNC_NODO_ID="nodo-principal" \
+  --name inventario \
+  inventario-app
+
+# O usando Docker Compose:
+docker compose up -d
+```
+
 ## Documentación adicional
 
 - [CHANGELOG.md](CHANGELOG.md)
