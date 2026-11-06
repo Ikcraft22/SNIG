@@ -1,6 +1,7 @@
 """Migraciones pequeñas y compatibles para bases de datos existentes."""
 
 import json
+import uuid as _uuid_mod
 
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
@@ -115,3 +116,43 @@ def eliminar_datos_farmaceuticos(engine: Engine) -> bool:
     if any(columna in columnas_finales for columna in _COLUMNAS_FARMACEUTICAS):
         raise RuntimeError("No se pudieron eliminar todos los campos farmacéuticos")
     return True
+
+
+def asegurar_columnas_uuid_y_tombstone(engine: Engine) -> bool:
+    """Añade columnas uuid, eliminado y fecha_eliminacion a las tablas sincronizables si no existen."""
+    tablas_objetivo = [
+        "productos",
+        "presentaciones",
+        "proveedores",
+        "movimientos_inventario",
+        "ventas",
+        "venta_items",
+    ]
+
+    modificado = False
+
+    for tabla in tablas_objetivo:
+        inspector = inspect(engine)
+        if tabla not in inspector.get_table_names():
+            continue
+        cols = {col["name"] for col in inspector.get_columns(tabla)}
+        with engine.begin() as conn:
+            if "uuid" not in cols:
+                conn.execute(text(f"ALTER TABLE {tabla} ADD COLUMN uuid VARCHAR(36) NULL"))
+                filas = conn.execute(text(f"SELECT id FROM {tabla}")).fetchall()
+                for (id_val,) in filas:
+                    conn.execute(
+                        text(f"UPDATE {tabla} SET uuid = :u WHERE id = :id"),
+                        {"u": str(_uuid_mod.uuid4()), "id": id_val},
+                    )
+                modificado = True
+
+            if "eliminado" not in cols:
+                conn.execute(text(f"ALTER TABLE {tabla} ADD COLUMN eliminado BOOLEAN NOT NULL DEFAULT 0"))
+                modificado = True
+
+            if "fecha_eliminacion" not in cols:
+                conn.execute(text(f"ALTER TABLE {tabla} ADD COLUMN fecha_eliminacion DATETIME NULL"))
+                modificado = True
+
+    return modificado

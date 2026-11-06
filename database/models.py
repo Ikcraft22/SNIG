@@ -1,3 +1,4 @@
+import uuid
 import json
 from datetime import datetime
 from enum import Enum as PythonEnum
@@ -55,6 +56,9 @@ class Producto(Base):
     __tablename__ = "productos"
     
     id = Column(Integer, primary_key=True)
+    uuid = Column(String(36), unique=True, nullable=False, index=True, default=lambda: str(uuid.uuid4()))
+    eliminado = Column(Boolean, nullable=False, default=False, index=True)
+    fecha_eliminacion = Column(DateTime, nullable=True)
     gtin = Column(String(20), unique=True, nullable=False, index=True)
     nombre = Column(String(255), nullable=False, index=True)
     descripcion = Column(Text)
@@ -80,6 +84,9 @@ class Proveedor(Base):
     __tablename__ = "proveedores"
 
     id = Column(Integer, primary_key=True)
+    uuid = Column(String(36), unique=True, nullable=False, index=True, default=lambda: str(uuid.uuid4()))
+    eliminado = Column(Boolean, nullable=False, default=False, index=True)
+    fecha_eliminacion = Column(DateTime, nullable=True)
     nombre = Column(String(255), nullable=False, index=True)
     contacto = Column(String(255))
     telefono = Column(String(50))
@@ -103,6 +110,9 @@ class Presentacion(Base):
     __tablename__ = "presentaciones"
     
     id = Column(Integer, primary_key=True)
+    uuid = Column(String(36), unique=True, nullable=False, index=True, default=lambda: str(uuid.uuid4()))
+    eliminado = Column(Boolean, nullable=False, default=False, index=True)
+    fecha_eliminacion = Column(DateTime, nullable=True)
     producto_id = Column(Integer, ForeignKey("productos.id"), nullable=False)
     tipo = Column(Enum(TipoPresentacion), nullable=False)
     cantidad = Column(Integer, default=1)  # Ej: 1 unidad por envase
@@ -127,6 +137,9 @@ class MovimientoInventario(Base):
     __tablename__ = "movimientos_inventario"
     
     id = Column(Integer, primary_key=True)
+    uuid = Column(String(36), unique=True, nullable=False, index=True, default=lambda: str(uuid.uuid4()))
+    eliminado = Column(Boolean, nullable=False, default=False, index=True)
+    fecha_eliminacion = Column(DateTime, nullable=True)
     producto_id = Column(Integer, ForeignKey("productos.id"), nullable=False)
     presentacion_id = Column(Integer, ForeignKey("presentaciones.id"), nullable=False)
     tipo_movimiento = Column(Enum(EstadoMovimiento), nullable=False)
@@ -149,6 +162,9 @@ class Venta(Base):
     __tablename__ = "ventas"
     
     id = Column(Integer, primary_key=True)
+    uuid = Column(String(36), unique=True, nullable=False, index=True, default=lambda: str(uuid.uuid4()))
+    eliminado = Column(Boolean, nullable=False, default=False, index=True)
+    fecha_eliminacion = Column(DateTime, nullable=True)
     numero_ticket = Column(String(50), unique=True, nullable=False, index=True)
     estado = Column(Enum(EstadoVenta), default=EstadoVenta.COMPLETADA)
     
@@ -173,6 +189,9 @@ class VentaItem(Base):
     __tablename__ = "venta_items"
     
     id = Column(Integer, primary_key=True)
+    uuid = Column(String(36), unique=True, nullable=False, index=True, default=lambda: str(uuid.uuid4()))
+    eliminado = Column(Boolean, nullable=False, default=False, index=True)
+    fecha_eliminacion = Column(DateTime, nullable=True)
     venta_id = Column(Integer, ForeignKey("ventas.id"), nullable=False)
     producto_id = Column(Integer, ForeignKey("productos.id"), nullable=False)
     presentacion_id = Column(Integer, ForeignKey("presentaciones.id"), nullable=False)
@@ -196,6 +215,9 @@ class Usuario(Base):
     __tablename__ = "usuarios"
     
     id = Column(Integer, primary_key=True)
+    uuid = Column(String(36), unique=True, nullable=False, index=True, default=lambda: str(uuid.uuid4()))
+    eliminado = Column(Boolean, nullable=False, default=False, index=True)
+    fecha_eliminacion = Column(DateTime, nullable=True)
     nombre = Column(String(255), nullable=False)
     email = Column(String(255), unique=True, nullable=True)
     rol = Column(String(50), default="cajero")  # "admin", "cajero", "inventario"

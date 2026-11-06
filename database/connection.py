@@ -60,10 +60,12 @@ def create_tables():
         from database.migrations import (
             asegurar_columna_password_hash,
             eliminar_datos_farmaceuticos,
+            asegurar_columnas_uuid_y_tombstone,
         )
 
         asegurar_columna_password_hash(engine)
         eliminar_datos_farmaceuticos(engine)
+        asegurar_columnas_uuid_y_tombstone(engine)
         logger.info("✅ Tablas creadas exitosamente")
     except Exception as e:
         logger.error(f"❌ Error al crear tablas: {e}")
