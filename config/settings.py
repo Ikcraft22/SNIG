@@ -62,6 +62,7 @@ DEBUG = os.getenv("DEBUG", "True") == "True"
 FLASK_PORT = int(os.getenv("FLASK_PORT", 5000))
 FLASK_HOST = os.getenv("FLASK_HOST", "0.0.0.0")
 SYNC_API_TOKEN = os.getenv("SYNC_API_TOKEN", "").strip()
+SYNC_NODO_ID = os.getenv("SYNC_NODO_ID", "nodo-principal").strip()
 ALERTA_STOCK_INTERVALO_MINUTOS = int(os.getenv("ALERTA_STOCK_INTERVALO_MINUTOS", "15"))
 if ALERTA_STOCK_INTERVALO_MINUTOS < 1:
     raise ValueError("ALERTA_STOCK_INTERVALO_MINUTOS debe ser al menos 1")

@@ -155,4 +155,16 @@ def asegurar_columnas_uuid_y_tombstone(engine: Engine) -> bool:
                 conn.execute(text(f"ALTER TABLE {tabla} ADD COLUMN fecha_eliminacion DATETIME NULL"))
                 modificado = True
 
+    # Asegurar columnas entity_uuid y origen_nodo_id en sync_changes si existe la tabla
+    inspector_sync = inspect(engine)
+    if "sync_changes" in inspector_sync.get_table_names():
+        sync_cols = {col["name"] for col in inspector_sync.get_columns("sync_changes")}
+        with engine.begin() as conn:
+            if "entity_uuid" not in sync_cols:
+                conn.execute(text("ALTER TABLE sync_changes ADD COLUMN entity_uuid VARCHAR(36) NULL"))
+                modificado = True
+            if "origen_nodo_id" not in sync_cols:
+                conn.execute(text("ALTER TABLE sync_changes ADD COLUMN origen_nodo_id VARCHAR(50) NOT NULL DEFAULT 'nodo-principal'"))
+                modificado = True
+
     return modificado

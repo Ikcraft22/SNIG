@@ -1,5 +1,7 @@
 import uuid
 import json
+import threading
+from contextlib import contextmanager
 from datetime import datetime
 from enum import Enum as PythonEnum
 
@@ -22,7 +24,25 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database.connection import Base
+from config.settings import SYNC_NODO_ID
 import enum
+
+_sync_local = threading.local()
+
+@contextmanager
+def sin_disparo_sync():
+    """Desactiva temporalmente el registro de eventos en sync_changes para evitar bucles de eco."""
+    anterior = getattr(_sync_local, "desactivado", False)
+    _sync_local.desactivado = True
+    try:
+        yield
+    finally:
+        _sync_local.desactivado = anterior
+
+
+def sync_esta_activo():
+    """Indica si el registro de eventos de sincronización está activo en el hilo actual."""
+    return not getattr(_sync_local, "desactivado", False)
 
 # ============== ENUMS ==============
 class TipoPresentacion(str, enum.Enum):
@@ -247,6 +267,8 @@ class SyncChange(Base):
     id = Column(Integer, primary_key=True, autoincrement=False)
     entity_type = Column(String(50), nullable=False, index=True)
     entity_id = Column(Integer, nullable=False, index=True)
+    entity_uuid = Column(String(36), nullable=True, index=True)
+    origen_nodo_id = Column(String(50), nullable=False, default=SYNC_NODO_ID)
     operation = Column(String(10), nullable=False)
     payload = Column(Text, nullable=False)
     occurred_at = Column(DateTime, nullable=False, server_default=func.now(), index=True)
@@ -279,8 +301,11 @@ def serializar_entidad_sync(modelo, entidad, connection=None):
     return payload
 
 
-def registrar_evento_sync(connection, entity_type, entity_id, operation, payload):
+def registrar_evento_sync(connection, entity_type, entity_id, operation, payload, entity_uuid=None, origen_nodo_id=None):
     """Inserta un cambio en la misma transacción que modifica la entidad."""
+    if not sync_esta_activo():
+        return
+
     dialect = connection.dialect.name
     if dialect == "sqlite":
         from sqlalchemy.dialects.sqlite import insert as dialect_insert
@@ -314,6 +339,8 @@ def registrar_evento_sync(connection, entity_type, entity_id, operation, payload
             id=secuencia,
             entity_type=entity_type,
             entity_id=entity_id,
+            entity_uuid=entity_uuid or payload.get("uuid"),
+            origen_nodo_id=origen_nodo_id or SYNC_NODO_ID,
             operation=operation,
             payload=json.dumps(payload, ensure_ascii=False, allow_nan=False),
         )
@@ -321,6 +348,8 @@ def registrar_evento_sync(connection, entity_type, entity_id, operation, payload
 
 
 def _registrar_cambio_mapeado(mapper, connection, entidad, operation):
+    if not sync_esta_activo():
+        return
     modelo = mapper.class_
     primary_key = mapper.primary_key[0].key
     payload = serializar_entidad_sync(
@@ -334,6 +363,8 @@ def _registrar_cambio_mapeado(mapper, connection, entidad, operation):
         getattr(entidad, primary_key),
         operation,
         payload,
+        entity_uuid=getattr(entidad, "uuid", None),
+        origen_nodo_id=SYNC_NODO_ID,
     )
 
 
