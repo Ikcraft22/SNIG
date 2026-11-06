@@ -253,10 +253,27 @@ pip install flask
 
 ## Despliegue con Docker
 
-El proyecto cuenta con configuración lista para ejecutarse en contenedores Docker (ideal para servidores y la API web):
+El proyecto cuenta con configuración lista para ejecutarse en contenedores Docker y se publica automáticamente como paquete de contenedor en **GitHub Packages (GHCR)**:
+
+### Usar la imagen preconstruida desde GitHub Packages (GHCR)
 
 ```bash
-# Construir la imagen
+# Descargar la imagen publicada
+docker pull ghcr.io/ikcraft22/snig:latest
+
+# Ejecutar el contenedor
+docker run -d \
+  -p 5000:5000 \
+  -e SYNC_API_TOKEN="tu_token_aqui" \
+  -e SYNC_NODO_ID="nodo-principal" \
+  --name inventario \
+  ghcr.io/ikcraft22/snig:latest
+```
+
+### Construcción local
+
+```bash
+# Construir la imagen localmente
 docker build -t inventario-app .
 
 # Ejecutar el contenedor
