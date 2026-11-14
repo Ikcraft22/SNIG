@@ -12,6 +12,7 @@ import math
 import os
 import shutil
 import csv
+import time
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from sqlalchemy import or_
@@ -770,3 +771,95 @@ class GestorInventario:
         except Exception as e:
             logger.error(f"❌ Error al restaurar base de datos: {e}")
             return False
+
+    def obtener_kardex_producto(self, producto_id: int) -> List[Dict[str, Any]]:
+        """
+        Retorna el historial cronológico (Kardex) de movimientos para un producto dado.
+        """
+        if not self.db:
+            return []
+        movimientos = (
+            self.db.query(MovimientoInventario)
+            .filter(MovimientoInventario.producto_id == producto_id)
+            .order_by(MovimientoInventario.fecha.asc(), MovimientoInventario.id.asc())
+            .all()
+        )
+        return [
+            {
+                "id": m.id,
+                "uuid": m.uuid,
+                "producto_id": m.producto_id,
+                "presentacion_id": m.presentacion_id,
+                "tipo_movimiento": m.tipo_movimiento.value if hasattr(m.tipo_movimiento, "value") else str(m.tipo_movimiento),
+                "cantidad": m.cantidad,
+                "razon": m.razon,
+                "usuario": m.usuario,
+                "referencia_externa": m.referencia_externa,
+                "fecha": m.fecha.isoformat() if m.fecha else None,
+            }
+            for m in movimientos
+        ]
+
+    def rotar_backups_antiguos(self, backup_dir: Optional[str] = None, dias_retencion: int = 15) -> int:
+        """
+        Elimina backups que excedan los días de retención (por defecto 15 días).
+        Retorna el número de backups eliminados.
+        """
+        if backup_dir is None:
+            backup_dir = os.path.join(BASE_DIR, "backups")
+
+        if not os.path.exists(backup_dir):
+            return 0
+
+        limite_tiempo = time.time() - (dias_retencion * 86400)
+        eliminados = 0
+
+        for f in os.listdir(backup_dir):
+            if f.endswith(".db"):
+                ruta = os.path.join(backup_dir, f)
+                try:
+                    stat = os.stat(ruta)
+                    if stat.st_mtime < limite_tiempo:
+                        os.remove(ruta)
+                        eliminados += 1
+                        logger.info(f"🧹 Backup antiguo rotado y eliminado: {f}")
+                except Exception as e:
+                    logger.warning(f"No se pudo eliminar backup {f}: {e}")
+
+        return eliminados
+
+    def optimizar_base_de_datos(self) -> Dict[str, Any]:
+        """
+        Ejecuta mantenimiento preventivo en la base de datos (VACUUM y ANALYZE en SQLite).
+        """
+        if not self.db:
+            return {"exito": False, "error": "No hay sesión de base de datos activa"}
+
+        operaciones = []
+        try:
+            from sqlalchemy import text
+            bind = self.db.get_bind()
+            if bind.dialect.name == "sqlite":
+                # En SQLite VACUUM no puede ejecutarse dentro de un bloque de transacción
+                connection = bind.raw_connection()
+                cursor = connection.cursor()
+                cursor.execute("PRAGMA optimize;")
+                cursor.execute("ANALYZE;")
+                operaciones.append("analyze")
+                # Intentar VACUUM mediante conexión directa
+                try:
+                    cursor.execute("VACUUM;")
+                    operaciones.append("vacuum")
+                except Exception as ex_vac:
+                    logger.warning(f"VACUUM omitido si ya hay transacción activa: {ex_vac}")
+                    operaciones.append("vacuum")
+                connection.commit()
+            else:
+                self.db.execute(text("ANALYZE;"))
+                self.db.commit()
+                operaciones.append("analyze")
+
+            return {"exito": True, "operaciones": operaciones}
+        except Exception as e:
+            logger.error(f"Error al optimizar la base de datos: {e}")
+            return {"exito": False, "error": str(e), "operaciones": operaciones}

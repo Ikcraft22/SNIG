@@ -251,3 +251,145 @@ def generar_reporte_pdf(datos: Dict[str, pd.DataFrame]) -> bytes:
 
     document.build(story, onFirstPage=_decorar_pagina, onLaterPages=_decorar_pagina)
     return buffer.getvalue()
+
+
+def generar_orden_compra_pdf(
+    numero_orden: str,
+    proveedor: Dict[str, Any],
+    items: list[Dict[str, Any]],
+    notas: str = "",
+) -> bytes:
+    """Genera una Orden de Compra formal en PDF para enviar a proveedores."""
+    buffer = io.BytesIO()
+    document = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=15 * mm,
+        rightMargin=15 * mm,
+        topMargin=20 * mm,
+        bottomMargin=20 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "OCTitulo",
+        parent=styles["Normal"],
+        fontSize=18,
+        leading=22,
+        textColor=COLOR_PRIMARIO,
+        fontName="Helvetica-Bold",
+    )
+    subtitle_style = ParagraphStyle(
+        "OCSubtitulo",
+        parent=styles["Normal"],
+        fontSize=10,
+        leading=14,
+        textColor=COLOR_OSCURO,
+    )
+    table_header_style = ParagraphStyle(
+        "OCTableHeader",
+        parent=styles["Normal"],
+        fontSize=9,
+        leading=12,
+        textColor=colors.white,
+        fontName="Helvetica-Bold",
+    )
+    table_cell_style = ParagraphStyle(
+        "OCTableCell",
+        parent=styles["Normal"],
+        fontSize=9,
+        leading=12,
+        textColor=COLOR_OSCURO,
+    )
+    table_cell_right = ParagraphStyle(
+        "OCTableCellR",
+        parent=table_cell_style,
+        alignment=TA_RIGHT,
+    )
+
+    story = [
+        Paragraph(f"ORDEN DE COMPRA: {escape(numero_orden)}", title_style),
+        Paragraph(f"Fecha de emisión: {datetime.now().strftime('%Y-%m-%d %H:%M')}", subtitle_style),
+        Spacer(1, 4 * mm),
+    ]
+
+    # Datos del proveedor
+    prov_nombre = proveedor.get("nombre", "Proveedor General")
+    prov_contacto = proveedor.get("contacto", "N/A")
+    prov_tel = proveedor.get("telefono", "N/A")
+    prov_email = proveedor.get("email", "N/A")
+
+    info_prov = [
+        [Paragraph(f"<b>Proveedor:</b> {escape(str(prov_nombre))}", subtitle_style),
+         Paragraph(f"<b>Contacto:</b> {escape(str(prov_contacto))}", subtitle_style)],
+        [Paragraph(f"<b>Teléfono:</b> {escape(str(prov_tel))}", subtitle_style),
+         Paragraph(f"<b>Email:</b> {escape(str(prov_email))}", subtitle_style)],
+    ]
+    tabla_prov = Table(info_prov, colWidths=[90 * mm, 90 * mm])
+    tabla_prov.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), COLOR_FILA_ALT),
+        ("BOX", (0, 0), (-1, -1), 0.5, COLOR_BORDE),
+        ("PADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.extend([tabla_prov, Spacer(1, 6 * mm)])
+
+    # Tabla de productos solicitados
+    encabezados = ["Producto", "Presentación", "Cantidad", "Costo Unit.", "Subtotal"]
+    rows = [[Paragraph(h, table_header_style) for h in encabezados]]
+
+    total_general = 0.0
+    for it in items:
+        prod = str(it.get("producto", ""))
+        pres = str(it.get("presentacion", "Unidad"))
+        cant = int(it.get("cantidad", 1))
+        costo = float(it.get("costo_unitario", 0.0))
+        subt = float(it.get("subtotal", cant * costo))
+        total_general += subt
+
+        rows.append([
+            Paragraph(escape(prod), table_cell_style),
+            Paragraph(escape(pres), table_cell_style),
+            Paragraph(str(cant), table_cell_right),
+            Paragraph(f"${costo:,.2f}", table_cell_right),
+            Paragraph(f"${subt:,.2f}", table_cell_right),
+        ])
+
+    if len(rows) == 1:
+        rows.append([Paragraph("Sin items registrados", table_cell_style)] + [Paragraph("-", table_cell_style)] * 4)
+
+    # Fila total
+    rows.append([
+        Paragraph("<b>TOTAL ORDEN</b>", table_cell_style),
+        Paragraph("", table_cell_style),
+        Paragraph("", table_cell_style),
+        Paragraph("", table_cell_style),
+        Paragraph(f"<b>${total_general:,.2f}</b>", table_cell_right),
+    ])
+
+    tabla_items = Table(rows, colWidths=[65 * mm, 35 * mm, 20 * mm, 30 * mm, 30 * mm])
+    tabla_items.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), COLOR_ENCABEZADO),
+        ("BOX", (0, 0), (-1, -1), 0.5, COLOR_BORDE),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.3, COLOR_BORDE),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, COLOR_FILA_ALT]),
+        ("BACKGROUND", (0, -1), (-1, -1), COLOR_FILA_ALT),
+        ("PADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.extend([tabla_items, Spacer(1, 6 * mm)])
+
+    if notas:
+        story.extend([
+            Paragraph("<b>Notas e instrucciones de entrega:</b>", subtitle_style),
+            Paragraph(escape(notas), subtitle_style),
+            Spacer(1, 4 * mm),
+        ])
+
+    def _decorar_oc(canvas, doc):
+        canvas.saveState()
+        canvas.setFillColor(COLOR_PRIMARIO)
+        canvas.rect(0, 11 * 72 - 8, 8.5 * 72, 8, fill=True, stroke=False)
+        canvas.restoreState()
+
+    document.build(story, onFirstPage=_decorar_oc, onLaterPages=_decorar_oc)
+    return buffer.getvalue()

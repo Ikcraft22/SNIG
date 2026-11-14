@@ -186,7 +186,68 @@ class GestorPOS:
         """
         self.db = db
         self.carrito = CarritoCompra()
+        self.carritos_en_espera: Dict[str, Dict[str, Any]] = {}
         self.numero_ticket_contador = self._obtener_proximo_numero_ticket()
+
+    def pausar_carrito(self, etiqueta: str = "En espera") -> Optional[str]:
+        """
+        Pone el carrito actual en espera asignándole un ID único y deja el carrito activo libre.
+        Retorna el cart_id si se pausó con éxito, o None si el carrito estaba vacío.
+        """
+        if not self.carrito.items:
+            logger.warning("⚠️ No se puede pausar un carrito vacío")
+            return None
+
+        cart_id = f"HOLD-{datetime.now().strftime('%H%M%S')}-{len(self.carritos_en_espera) + 1}"
+        self.carritos_en_espera[cart_id] = {
+            "id": cart_id,
+            "etiqueta": etiqueta,
+            "fecha": datetime.now().isoformat(),
+            "carrito": self.carrito,
+            "total": self.carrito.total,
+            "items_count": len(self.carrito.items),
+        }
+        self.carrito = CarritoCompra()
+        logger.info(f"⏸️ Carrito pausado con ID: {cart_id} ({etiqueta})")
+        return cart_id
+
+    def listar_carritos_en_espera(self) -> List[Dict[str, Any]]:
+        """Devuelve un resumen de todos los carritos en espera."""
+        return [
+            {
+                "id": c["id"],
+                "etiqueta": c["etiqueta"],
+                "fecha": c["fecha"],
+                "total": c["total"],
+                "items_count": c["items_count"],
+            }
+            for c in self.carritos_en_espera.values()
+        ]
+
+    def contar_carritos_en_espera(self) -> int:
+        """Cantidad de carritos actualmente en espera."""
+        return len(self.carritos_en_espera)
+
+    def reanudar_carrito(self, cart_id: str) -> bool:
+        """
+        Recupera un carrito en espera y lo asigna como carrito activo.
+        """
+        if cart_id not in self.carritos_en_espera:
+            logger.warning(f"⚠️ No se encontró el carrito en espera: {cart_id}")
+            return False
+
+        datos = self.carritos_en_espera.pop(cart_id)
+        self.carrito = datos["carrito"]
+        logger.info(f"▶️ Carrito reanudado: {cart_id}")
+        return True
+
+    def descartar_carrito_en_espera(self, cart_id: str) -> bool:
+        """Elimina un carrito en espera sin recuperarlo."""
+        if cart_id in self.carritos_en_espera:
+            del self.carritos_en_espera[cart_id]
+            logger.info(f"🗑️ Carrito en espera descartado: {cart_id}")
+            return True
+        return False
     
     def _obtener_proximo_numero_ticket(self) -> int:
         """Obtiene el próximo número de ticket"""

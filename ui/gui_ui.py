@@ -24,7 +24,7 @@ try:
         QComboBox, QSpinBox, QDoubleSpinBox, QDialog, QDialogButtonBox,
             QInputDialog, QAction, QMenu, QDateEdit,
             QMessageBox, QTabWidget, QListWidget, QListWidgetItem, QFileDialog,
-            QSystemTrayIcon,
+            QSystemTrayIcon, QCompleter,
         QPlainTextEdit, QSplitter, QStatusBar, QFormLayout, QStackedWidget,
             QSizePolicy, QHeaderView, QSlider, QFrame, QGridLayout, QButtonGroup
     )
@@ -1361,9 +1361,16 @@ class VentanaPrincipal(QMainWindow):
         self.entrada_gtin_pos = QLineEdit()
         label_busqueda.setBuddy(self.entrada_gtin_pos)
         self.entrada_gtin_pos.setAccessibleName("Escanear o buscar Barcode")
-        self.entrada_gtin_pos.setPlaceholderText("Código")
+        self.entrada_gtin_pos.setPlaceholderText("Código (F1 para enfocar)")
         self.entrada_gtin_pos.setFixedHeight(36)
         self.entrada_gtin_pos.returnPressed.connect(self.agregar_a_carrito_gui)
+
+        # Autocompletado predictivo para agilizar la venta en POS
+        self.completer_pos = QCompleter([])
+        self.completer_pos.setCaseSensitivity(Qt.CaseInsensitive)
+        self.completer_pos.setFilterMode(Qt.MatchContains)
+        self.entrada_gtin_pos.setCompleter(self.completer_pos)
+
         layout_busqueda.addWidget(self.entrada_gtin_pos)
 
         self.entrada_gtin_pos.setFocus()
@@ -1445,14 +1452,28 @@ class VentanaPrincipal(QMainWindow):
         btn_eliminar.clicked.connect(self.eliminar_del_carrito_gui)
         layout_botones_pos.addWidget(btn_eliminar)
 
-        btn_vaciar = QPushButton("🗑️ Vaciar")
+        btn_vaciar = QPushButton("🗑️ Vaciar (F3)")
         btn_vaciar.setMinimumHeight(58)
         btn_vaciar.setMinimumWidth(150)
         btn_vaciar.setStyleSheet("font-size: 15px; font-weight: 700;")
         btn_vaciar.clicked.connect(self.vaciar_carrito_gui)
         layout_botones_pos.addWidget(btn_vaciar)
 
-        btn_pagar = QPushButton("💳 Procesar Pago")
+        btn_pausar = QPushButton("⏸️ En Espera (F4)")
+        btn_pausar.setMinimumHeight(58)
+        btn_pausar.setMinimumWidth(150)
+        btn_pausar.setStyleSheet("font-size: 15px; font-weight: 700; background-color: #d97706; color: white;")
+        btn_pausar.clicked.connect(self.pausar_carrito_gui)
+        layout_botones_pos.addWidget(btn_pausar)
+
+        btn_esperas = QPushButton("📋 Ver Esperas (F5)")
+        btn_esperas.setMinimumHeight(58)
+        btn_esperas.setMinimumWidth(150)
+        btn_esperas.setStyleSheet("font-size: 15px; font-weight: 700;")
+        btn_esperas.clicked.connect(self.mostrar_carritos_en_espera_gui)
+        layout_botones_pos.addWidget(btn_esperas)
+
+        btn_pagar = QPushButton("💳 Procesar Pago (F2)")
         btn_pagar.setMinimumHeight(62)
         btn_pagar.setMinimumWidth(220)
         btn_pagar.setStyleSheet(
@@ -2427,6 +2448,130 @@ class VentanaPrincipal(QMainWindow):
         self.pos.carrito.vaciar_carrito()
         self.tabla_carrito.setRowCount(0)
         self.actualizar_resumen_carrito()
+
+    def pausar_carrito_gui(self):
+        """Pone el carrito actual en espera para atender a otro cliente."""
+        if not self.pos.carrito.items:
+            QMessageBox.information(self, "Información", "El carrito está vacío, no se puede poner en espera.")
+            return
+
+        etiqueta, ok = QInputDialog.getText(
+            self,
+            "Poner en espera",
+            "Nombre o referencia para este ticket:",
+            text=f"Cliente {self.pos.contar_carritos_en_espera() + 1}"
+        )
+        if not ok or not etiqueta.strip():
+            etiqueta = "En espera"
+
+        cart_id = self.pos.pausar_carrito(etiqueta.strip())
+        if cart_id:
+            self.tabla_carrito.setRowCount(0)
+            self.actualizar_resumen_carrito()
+            self.mostrar_mensaje_temporal(f"Carrito puesto en espera ({cart_id})")
+
+    def mostrar_carritos_en_espera_gui(self):
+        """Muestra diálogo para seleccionar y reanudar un carrito en espera."""
+        carritos = self.pos.listar_carritos_en_espera()
+        if not carritos:
+            QMessageBox.information(self, "En Espera", "No hay carritos en espera.")
+            return
+
+        dialogo = QDialog(self)
+        dialogo.setWindowTitle("Carritos en Espera")
+        dialogo.resize(500, 300)
+        layout = QVBoxLayout(dialogo)
+
+        tabla = QTableWidget()
+        tabla.setColumnCount(4)
+        tabla.setHorizontalHeaderLabels(["ID", "Referencia", "Items", "Total"])
+        tabla.setRowCount(len(carritos))
+        tabla.setSelectionBehavior(QTableWidget.SelectRows)
+        tabla.setEditTriggers(QTableWidget.NoEditTriggers)
+
+        for i, c in enumerate(carritos):
+            tabla.setItem(i, 0, QTableWidgetItem(c["id"]))
+            tabla.setItem(i, 1, QTableWidgetItem(c["etiqueta"]))
+            tabla.setItem(i, 2, QTableWidgetItem(str(c["items_count"])))
+            tabla.setItem(i, 3, QTableWidgetItem(formatear_moneda(c["total"])))
+
+        layout.addWidget(tabla)
+
+        btn_layout = QHBoxLayout()
+        btn_recuperar = QPushButton("▶️ Reanudar")
+        btn_descartar = QPushButton("🗑️ Descartar")
+        btn_cerrar = QPushButton("Cerrar")
+        btn_layout.addWidget(btn_recuperar)
+        btn_layout.addWidget(btn_descartar)
+        btn_layout.addWidget(btn_cerrar)
+        layout.addLayout(btn_layout)
+
+        def reanudar_sel():
+            row = tabla.currentRow()
+            if row < 0:
+                return
+            cart_id = tabla.item(row, 0).text()
+            if self.pos.carrito.items:
+                resp = QMessageBox.question(
+                    dialogo,
+                    "Reemplazar carrito",
+                    "El carrito activo tiene productos. ¿Deseas reemplazarlo con el carrito seleccionado?",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if resp != QMessageBox.Yes:
+                    return
+
+            self.pos.reanudar_carrito(cart_id)
+            self.actualizar_tabla_carrito()
+            dialogo.accept()
+
+        def descartar_sel():
+            row = tabla.currentRow()
+            if row < 0:
+                return
+            cart_id = tabla.item(row, 0).text()
+            self.pos.descartar_carrito_en_espera(cart_id)
+            tabla.removeRow(row)
+
+        btn_recuperar.clicked.connect(reanudar_sel)
+        btn_descartar.clicked.connect(descartar_sel)
+        btn_cerrar.clicked.connect(dialogo.reject)
+        dialogo.exec_()
+
+    def keyPressEvent(self, event):
+        """Manejo de atajos de teclado globales (F-Keys y Escape)."""
+        tecla = event.key()
+        if tecla == Qt.Key_F1:
+            # F1: Ir a POS y enfocar buscador
+            self.pestanas.setCurrentWidget(self.pestana_pos)
+            self._enfocar_gtin_pos()
+            event.accept()
+            return
+        elif tecla == Qt.Key_F2:
+            # F2: Cobrar / Procesar pago
+            if self.pestanas.currentWidget() == self.pestana_pos:
+                self.procesar_pago_gui()
+                event.accept()
+                return
+        elif tecla == Qt.Key_F3:
+            # F3: Vaciar carrito
+            if self.pestanas.currentWidget() == self.pestana_pos:
+                self.vaciar_carrito_gui()
+                event.accept()
+                return
+        elif tecla == Qt.Key_F4:
+            # F4: Poner carrito en espera
+            if self.pestanas.currentWidget() == self.pestana_pos:
+                self.pausar_carrito_gui()
+                event.accept()
+                return
+        elif tecla == Qt.Key_F5:
+            # F5: Ver carritos en espera
+            if self.pestanas.currentWidget() == self.pestana_pos:
+                self.mostrar_carritos_en_espera_gui()
+                event.accept()
+                return
+        super().keyPressEvent(event)
     
     def procesar_pago_gui(self):
         """Procesa el pago desde la GUI"""
