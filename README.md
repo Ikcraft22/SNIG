@@ -43,12 +43,12 @@ En las pantallas de la aplicación el campo se muestra como **Barcode**. En esta
 
 ## Estado actual
 
-Versión actual: 1.2.0
+Versión actual: 1.3.0
 Estado: funcional y listo para uso local con GUI, Dashboard Streamlit y API REST. Cuenta con una suite de 187 pruebas automatizadas pasando al 100%.
 
 La arquitectura de sincronización cuenta con el feed de cambios (`/api/sync/changes`) y el cliente bidireccional (`core.sync_client.ClienteSincronizacion`). Requiere `SYNC_API_TOKEN` en `.env` y el encabezado `Authorization: Bearer <token>`. La sincronización utiliza identidades globales UUID v4, bajas lógicas y anti-eco para sucursales distribuidas.
 
-Genera un token aleatorio (por ejemplo, con `python -c "import secrets; print(secrets.token_urlsafe(32))"`), configúralo en el servidor como `SYNC_API_TOKEN` y guárdalo de forma segura también en los clientes. No lo compartas ni lo subas al repositorio.
+Para configurar la autenticación de sincronización, genera un token aleatorio (por ejemplo: `python -c "import secrets; print(secrets.token_urlsafe(32))"`) y asígnalo a la variable `SYNC_API_TOKEN` en el entorno del servidor y clientes autorizados.
 
 ## Características principales de la GUI
 

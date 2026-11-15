@@ -1,7 +1,7 @@
 # Documentación completa del sistema
 
-Fecha de actualización: 26 de octubre de 2026
-Versión: 1.2.0
+Fecha de actualización: 14 de noviembre de 2026
+Versión: 1.3.0
 Estado: funcional
 
 ## 1. Introducción

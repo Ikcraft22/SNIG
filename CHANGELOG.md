@@ -1,6 +1,6 @@
 # CHANGELOG - Historial de Cambios
 
-## [Sin publicar]
+## [1.3.0] - 14 de noviembre de 2026
 
 ### Agregado
 - ✅ **Sincronización Bidireccional (Fase 4)**:
