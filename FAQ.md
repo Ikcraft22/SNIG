@@ -66,7 +66,16 @@ La interfaz muestra **Barcode** donde antes se mostraba GTIN. En esta documentac
 
 ## ¿Cómo funciona el POS?
 
-En la sección **Punto de venta** puedes escribir o escanear el Barcode (GTIN) y presionar Enter para agregar el producto directamente al carrito. Se puede pagar en Efectivo o por Transferencia; los botones también aceptan las teclas `1` y `2`. Si se repite el mismo producto 10 veces seguidas, el sistema muestra una alerta de compra masiva.
+En la sección **Punto de venta** puedes escribir o escanear el Barcode (GTIN) con autocompletado y presionar Enter para agregar el producto directamente al carrito. Se puede pagar en Efectivo o por Transferencia; los botones también aceptan las teclas `1` y `2`. 
+
+Además, dispones de atajos de teclado rápidos con teclas de función (F-Keys):
+- **F1**: Enfocar barra de búsqueda / Barcode.
+- **F2**: Iniciar proceso de cobro.
+- **F3**: Limpiar / vaciar carrito.
+- **F4**: Pausar carrito actual (*Hold Cart*) para atender a otro cliente.
+- **F5**: Ver y reanudar carritos en espera.
+
+Si se repite el mismo producto 10 veces seguidas, el sistema muestra una alerta de compra masiva.
 
 ## ¿Por qué no puedo pagar con tarjeta?
 
@@ -79,6 +88,25 @@ Abre **Proveedores** desde la navegación lateral, pulsa **Nuevo proveedor** y c
 ## ¿La interfaz está preparada para pantallas táctiles?
 
 Sí. La interfaz de inventario y POS fue ajustada con botones más grandes, mejor espaciado y un diseño más cómodo para uso táctil.
+
+## ¿Cómo desplegar con Docker?
+
+Puedes levantar el servidor API web en un contenedor Docker con Docker Compose:
+
+```bash
+docker compose up -d
+```
+
+O construir la imagen manualmente:
+
+```bash
+docker build -t snig-server .
+docker run -p 5000:5000 snig-server
+```
+
+## ¿Cómo funciona la sincronización entre sucursales?
+
+SNIG cuenta con un módulo de sincronización bidireccional (`core/sync_client.py`) que consume el feed de cambios (`/api/sync/changes`). Aplica resolución Last-Write-Wins (LWW) para catálogos y un registro inmutable de movimientos y ventas, protegiendo contra bucles de eco con el contexto `sin_disparo_sync()`.
 
 ## ¿Cómo hacer un backup de la base de datos?
 

@@ -31,8 +31,8 @@ El proyecto está organizado por módulos:
 
 - `config/`: configuración global del sistema
 - `database/`: modelos SQLAlchemy y conexión a la base de datos
-- `core/`: lógica de negocio de inventario y POS
-- `reporting/`: módulo de analítica interactiva y dashboard con Streamlit y Plotly
+- `core/`: lógica de negocio de inventario, POS (`pos_manager.py`), cliente de sincronización (`sync_client.py`), etc.
+- `reporting/`: módulo de analítica interactiva y dashboard con Streamlit/Plotly y exportación de reportes/órdenes de compra en PDF (`pdf_export.py`)
 - `api/`: integra servicios de validación y búsqueda de GTIN
 - `ui/`: interfaz gráfica (PyQt5) y terminal
 - `web/`: aplicación Flask con rutas y endpoints

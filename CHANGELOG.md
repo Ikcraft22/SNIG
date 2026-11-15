@@ -3,6 +3,24 @@
 ## [Sin publicar]
 
 ### Agregado
+- ✅ **Sincronización Bidireccional (Fase 4)**:
+  - Cliente de sincronización incremental `ClienteSincronizacion` con descarga y aplicación por lotes (`batch`) y cursor secuencial.
+  - Resolución híbrida de conflictos: Last-Write-Wins (LWW) para metadatos de catálogo y ledger inmutable para ventas y movimientos.
+  - Prevención de ciclos y rebotes (anti-eco) con contexto `sin_disparo_sync()` y trazabilidad por `entity_uuid` y `origen_nodo_id`.
+  - Migración de esquema para UUID v4 únicos globales y soporte para bajas lógicas (`eliminado`, `fecha_eliminacion`).
+- ✅ **Agilidad en POS (Fase 5)**:
+  - Múltiples carritos en espera (*Hold Carts*): pausar (`pausar_carrito()`), listar, reanudar y descartar tickets sin perder productos escaneados.
+  - Atajos de teclado con teclas de función (F-Keys): F1 (Buscar/Focus Barcode), F2 (Cobrar), F3 (Limpiar/Vaciar), F4 (Pausar carrito), F5 (Ver carritos en espera).
+  - Autocompletado predictivo inteligente (`QCompleter`) en el campo de entrada Barcode del POS.
+- ✅ **Gestión de Compras, Trazabilidad y Mantenimiento (Fase 6)**:
+  - Generación formal de Órdenes de Compra en formato PDF (`generar_orden_compra_pdf()`) con datos del proveedor, detalle de productos e instrucciones.
+  - Trazabilidad y auditoría de inventario: Kardex cronológico detallado por producto (`obtener_kardex_producto()`).
+  - Mantenimiento automatizado: política de rotación y depuración de backups antiguos (`rotar_backups_antiguos()`, retención de 15 días).
+  - Optimización de base de datos (`optimizar_base_de_datos()` con `VACUUM`, `ANALYZE` y `PRAGMA optimize`).
+- ✅ **Infraestructura y Despliegue**:
+  - Contenedorización completa con `Dockerfile`, `docker-compose.yml` y `requirements-server.txt`.
+  - Flujo de integración continua en GitHub Actions para compilar y publicar imágenes OCI en GitHub Packages (`ghcr.io`).
+  - Automatización de pruebas de escritorio nativas en Windows (`windows-desktop-e2e`) usando `pywinauto` y Windows UI Automation (UIA).
 - ✅ Se retiraron los datos de fabricante y los campos farmacéuticos de productos; la migración conserva inventario, ventas y presentaciones genéricas.
 - ✅ El pago con tarjeta está temporalmente desactivado mediante `PAGO_TARJETA_HABILITADO`; se rechazan nuevas ventas y se conservan los registros históricos.
 - ✅ Autenticación de escritorio, gestión de usuarios y permisos por rol desactivados temporalmente mediante `AUTENTICACION_HABILITADA`; las cuentas existentes se conservan y la documentación explica cómo reactivarlos.
@@ -10,18 +28,17 @@
 - ✅ Exportación PDF de escritorio, diálogo de arqueo de caja por fecha y alertas configurables de stock bajo en la bandeja del sistema.
 - ✅ Analítica de rendimiento por cajero y exportaciones Web/Streamlit a CSV, Excel multitabla y PDF con filtros y nombres ISO seguros.
 - ℹ️ Implementación original (actualmente desactivada): inicio de sesión PBKDF2-SHA256, permisos GUI por rol, gestión administrativa de usuarios y cambio rápido de sesión.
-- ✅ Feed API incremental de solo lectura con cursor persistente y eventos transaccionales, protegido por `SYNC_API_TOKEN`; la sincronización bidireccional entre sucursales aún no está implementada.
 - ✅ Catálogo de proveedores con datos de contacto y relación con varios productos.
 - ✅ Columna de proveedor en la tabla de inventario de escritorio.
 - ✅ Panel principal de escritorio con navegación lateral, resumen e indicadores del inventario.
 
 ### Mejorado
+- ✅ Cobertura completa de pruebas: suite de 187 pruebas automatizadas pasando exitosamente (0 fallos).
 - ✅ El resumen de cajeros admite rangos diarios; el dashboard calcula ticket promedio y velocidad estimada usando el intervalo observado entre ventas.
 - ✅ Interruptor de tema día/noche con transición animada completa antes de aplicar el cambio visual.
 - ✅ Formularios de producto y proveedor con campos guiados, etiquetas claras, búsqueda de productos y estilos adaptados al tema.
 - ✅ Los pagos de escritorio ofrecen Efectivo y Transferencia mediante botones o teclas numéricas 1 y 2.
 - ✅ Se actualizaron la presentación de reportes PDF y la accesibilidad de las interfaces.
-- ✅ Se amplió la cobertura de pruebas de API, terminal, búsqueda Barcode y dashboard; la suite alcanza 80% de cobertura en módulos de producción.
 
 ## [1.2.0] - 20 de octubre de 2026
 

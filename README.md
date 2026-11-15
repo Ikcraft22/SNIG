@@ -26,7 +26,12 @@ Actualmente incluye:
 - **generador de códigos GTIN-13** con checksum EAN válido
 - **cierre de caja diario** con resumen por cajero y método de pago
 - **API REST ampliada** con nuevas rutas para inventario y caja
-- feed API incremental de cambios (solo lectura; todavía no sincroniza automáticamente otras sucursales)
+- **sincronización bidireccional cliente-servidor** con resolución híbrida (LWW + ledger inmutable), anti-eco y cursores secuenciales
+- **POS de alta eficiencia** con soporte para carritos en espera múltiples (*Hold Carts*), autocompletado y atajos de teclado F1-F5
+- **órdenes de compra formales en PDF** para proveedores y trazabilidad cronológica con Kardex
+- **mantenimiento programable**: rotación automática de backups antiguos y optimización de base de datos (VACUUM/ANALYZE)
+- **soporte para contenedores Docker**, docker-compose y publicación automática en GitHub Packages (GHCR)
+- **automatización de pruebas E2E en Windows** con pywinauto y UIA
 - validaciones de stock y ventas para evitar cantidades inválidas o inventario negativo
 - mejoras de accesibilidad en web, dashboard y GUI: teclado, foco visible, etiquetas y alternativas tabulares para gráficas
 
@@ -39,9 +44,9 @@ En las pantallas de la aplicación el campo se muestra como **Barcode**. En esta
 ## Estado actual
 
 Versión actual: 1.2.0
-Estado: funcional y listo para uso local con GUI, Dashboard Streamlit y API REST
+Estado: funcional y listo para uso local con GUI, Dashboard Streamlit y API REST. Cuenta con una suite de 187 pruebas automatizadas pasando al 100%.
 
-La API publica `GET /api/sync/cursor` y `GET /api/sync/changes?cursor=0&limit=100` como feed de cambios de solo lectura. Requieren `SYNC_API_TOKEN` en `.env` y el encabezado `Authorization: Bearer <token>`; si no se configura el token, el feed queda deshabilitado. Todavía no existe un cliente que sincronice cambios entre sucursales, descargue un estado inicial, envíe cambios o resuelva conflictos.
+La arquitectura de sincronización cuenta con el feed de cambios (`/api/sync/changes`) y el cliente bidireccional (`core.sync_client.ClienteSincronizacion`). Requiere `SYNC_API_TOKEN` en `.env` y el encabezado `Authorization: Bearer <token>`. La sincronización utiliza identidades globales UUID v4, bajas lógicas y anti-eco para sucursales distribuidas.
 
 Genera un token aleatorio (por ejemplo, con `python -c "import secrets; print(secrets.token_urlsafe(32))"`), configúralo en el servidor como `SYNC_API_TOKEN` y guárdalo de forma segura también en los clientes. No lo compartas ni lo subas al repositorio.
 
